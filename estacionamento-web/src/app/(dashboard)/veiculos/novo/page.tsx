@@ -6,7 +6,8 @@ import { useStorage } from '@/hooks/useStorage';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { ArrowLeft, CheckCircle, AlertTriangle } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea'; // Assuming Textarea component exists or use Input for now
+import { ArrowLeft, CheckCircle, AlertTriangle, MessageCircle, Phone } from 'lucide-react';
 
 function NovoVeiculoContent() {
     const router = useRouter();
@@ -21,7 +22,9 @@ function NovoVeiculoContent() {
         modelo: '',
         apartamento: '',
         bloco: '',
-        vaga: vagaParam || ''
+        vaga: vagaParam || '',
+        dependentes: '',
+        whatsapp: ''
     });
 
     const [moradores, setMoradores] = useState<any[]>([]);
@@ -36,7 +39,17 @@ function NovoVeiculoContent() {
 
     const handlePlacaChange = (texto: string) => {
         const placaUpper = texto.toUpperCase();
-        setForm(prev => ({ ...prev, placa: placaUpper, proprietario: '', modelo: '', apartamento: '', bloco: '' }));
+
+        let novoForm = {
+            ...form,
+            placa: placaUpper,
+            proprietario: '',
+            modelo: '',
+            apartamento: '',
+            bloco: '',
+            dependentes: '',
+            whatsapp: ''
+        };
 
         if (placaUpper.length >= 3) {
             const encontrado = moradores.find((m: any) => {
@@ -45,16 +58,20 @@ function NovoVeiculoContent() {
             });
 
             if (encontrado) {
-                setForm(prev => ({
-                    ...prev,
+                novoForm = {
+                    ...novoForm,
                     placa: String(encontrado.placa_exibicao || placaUpper),
                     proprietario: String(encontrado.nome_responsavel || ""),
                     modelo: String(encontrado.carro_detalhes || encontrado.moto_detalhes || ""),
                     apartamento: String(encontrado.apartamento || ""),
                     bloco: String(encontrado.bloco || ""),
-                }));
+                    dependentes: String(encontrado.lista_moradores || "Nenhum dependente"),
+                    whatsapp: String(encontrado.whatsapp || "")
+                };
             }
         }
+
+        setForm(novoForm);
     };
 
     const confirmarEntrada = async () => {
@@ -71,6 +88,16 @@ function NovoVeiculoContent() {
         const sucesso = await salvarVeiculo(form);
         if (sucesso) router.push('/');
         else alert("Erro ao salvar.");
+    };
+
+    const abrirWhatsapp = () => {
+        if (!form.whatsapp) return;
+        const numero = form.whatsapp.replace(/\D/g, '');
+        if (numero) {
+            window.open(`https://wa.me/55${numero}`, '_blank');
+        } else {
+            alert("Número de WhatsApp inválido.");
+        }
     };
 
     return (
@@ -120,7 +147,28 @@ function NovoVeiculoContent() {
 
                     <div className="space-y-2">
                         <label className="text-sm text-gray-400">Responsável</label>
-                        <Input value={form.proprietario} readOnly className="bg-navy/50 border-gray-600 text-gray-300" />
+                        <div className="flex gap-2">
+                            <Input value={form.proprietario} readOnly className="bg-navy/50 border-gray-600 text-gray-300 flex-1" />
+                            {form.whatsapp && (
+                                <Button
+                                    onClick={abrirWhatsapp}
+                                    className="bg-green-600 hover:bg-green-700 text-white px-3"
+                                    title="Chamar no WhatsApp"
+                                >
+                                    <MessageCircle size={20} />
+                                </Button>
+                            )}
+                        </div>
+                    </div>
+
+                    <div className="space-y-2">
+                        <label className="text-sm text-gray-400">Dependentes</label>
+                        <Input
+                            value={form.dependentes}
+                            readOnly
+                            className="bg-navy/50 border-gray-600 text-gray-300 italic"
+                            placeholder="Nenhum dependente registrado"
+                        />
                     </div>
 
                     <div className="space-y-2">
