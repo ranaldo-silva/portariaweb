@@ -47,7 +47,7 @@ function NovoVeiculoContent() {
             if (encontrado) {
                 setForm(prev => ({
                     ...prev,
-                    placa: String(encontrado.placa_exibicao || pExibicao || placaUpper),
+                    placa: String(encontrado.placa_exibicao || placaUpper),
                     proprietario: String(encontrado.nome_responsavel || ""),
                     modelo: String(encontrado.carro_detalhes || encontrado.moto_detalhes || ""),
                     apartamento: String(encontrado.apartamento || ""),
