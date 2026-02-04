@@ -10,6 +10,8 @@ import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { Search, Bike, User as UserIcon, Package, Car, X, LogIn } from 'lucide-react';
 
+import { DetailsModal } from '@/components/DetailsModal';
+
 export default function Dashboard() {
     const router = useRouter();
     const { sincronizarMoradores, getVeiculos, removerVeiculo, getEncomendasAtivas } = useStorage();
@@ -20,6 +22,7 @@ export default function Dashboard() {
     const [encomendas, setEncomendas] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
     const [vagaSel, setVagaSel] = useState<any>(null);
+    const [itemDetalhes, setItemDetalhes] = useState<any>(null); // New state for modal
     const [filtroMoto, setFiltroMoto] = useState(false);
     const [filtroBloco, setFiltroBloco] = useState(''); // '' = Todos
 
@@ -63,7 +66,17 @@ export default function Dashboard() {
         const termo = busca.toLowerCase().trim();
         if (termo === "" && !filtroMoto && !filtroBloco) return false;
         if (termo === "") return true;
-        const campos = [m.nome_responsavel, m.carro_detalhes, m.moto_detalhes, m.lista_moradores, m.bloco, m.apartamento];
+
+        // Deep search including Dependents (lista_moradores/dependentes)
+        const dependentes = String(m.lista_moradores || m.lista_morador || m.dependentes || "");
+        const campos = [
+            m.nome_responsavel,
+            m.carro_detalhes,
+            m.moto_detalhes,
+            dependentes,
+            m.bloco,
+            m.apartamento
+        ];
         return campos.some(c => String(c || "").toLowerCase().includes(termo));
     });
 
@@ -124,7 +137,11 @@ export default function Dashboard() {
                     {filtrados.map(m => {
                         const temEncomenda = encomendas.some(enc => enc.morador_id === m.id);
                         return (
-                            <div key={m.id} className="flex items-start gap-3 p-3 border-b border-gray-700 last:border-0 hover:bg-navy/50 cursor-pointer" onClick={() => setBusca(m.nome_responsavel)}>
+                            <div
+                                key={m.id}
+                                className="flex items-start gap-3 p-3 border-b border-gray-700 last:border-0 hover:bg-navy/50 cursor-pointer"
+                                onClick={() => setItemDetalhes(m)} // Open modal on click
+                            >
                                 <div className={cn("h-10 w-10 rounded-full flex items-center justify-center font-bold", m.moto_detalhes ? "bg-gold text-black" : "bg-blue-900 text-white")}>
                                     {m.apartamento}
                                 </div>
@@ -133,6 +150,7 @@ export default function Dashboard() {
                                     <p className="text-xs text-gray-400 line-clamp-2">
                                         {m.carro_detalhes} {m.moto_detalhes && `| 🏍️ ${m.moto_detalhes}`}
                                     </p>
+                                    {/* Show matched dependent if pertinent? For now just showing details modal is enough */}
                                     {temEncomenda && <span className="text-xs font-bold text-gold flex items-center gap-1 mt-1"><Package size={12} /> TEM ENCOMENDA</span>}
                                 </div>
                             </div>
@@ -170,7 +188,7 @@ export default function Dashboard() {
                 </div>
             </div>
 
-            {/* MODAL VAGA (Simple Overlay) */}
+            {/* MODAL VAGA (Simple Overlay) - Keeping strict control over this specific one */}
             {vagaSel && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in">
                     <Card className="w-full max-w-md bg-navy border-gold shadow-2xl">
@@ -209,6 +227,15 @@ export default function Dashboard() {
                     </Card>
                 </div>
             )}
+
+            {/* NEW DETAILS MODAL */}
+            <DetailsModal
+                isOpen={!!itemDetalhes}
+                onClose={() => setItemDetalhes(null)}
+                title={itemDetalhes?.nome_responsavel || "Detalhes"}
+                data={itemDetalhes}
+                type="morador"
+            />
         </div>
     );
 }

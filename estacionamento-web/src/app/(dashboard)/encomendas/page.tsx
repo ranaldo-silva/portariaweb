@@ -9,6 +9,8 @@ import { Badge } from '@/components/ui/badge'; // Wait, I didn't create Badge, I
 import { Search, Camera, Send, Package, Check, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
+import { DetailsModal } from '@/components/DetailsModal';
+
 export default function Encomendas() {
     const { getMoradoresBase, registrarEncomenda, getEncomendasAtivas, validarTokenRetirada, removerEncomenda } = useStorage();
 
@@ -21,6 +23,7 @@ export default function Encomendas() {
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     const [encomendasPendentes, setEncomendasPendentes] = useState<any[]>([]);
+    const [itemDetalhes, setItemDetalhes] = useState<any>(null); // Details state
     const [tokenDigitado, setTokenDigitado] = useState('');
     const [loading, setLoading] = useState(false);
 
@@ -213,8 +216,8 @@ export default function Encomendas() {
 
                 <div className="space-y-3 max-h-[80vh] overflow-y-auto pr-2">
                     {encomendasPendentes.map(enc => (
-                        <Card key={enc.id} className="bg-white border-none shadow-sm">
-                            <CardContent className="p-4 flex items-center gap-3">
+                        <Card key={enc.id} className="bg-white border-none shadow-sm cursor-pointer hover:bg-gray-50 transition-colors">
+                            <CardContent className="p-4 flex items-center gap-3" onClick={() => setItemDetalhes(enc)}>
                                 {enc.foto_url ? (
                                     <img src={enc.foto_url} className="w-12 h-12 rounded object-cover bg-gray-200" alt="Pacote" />
                                 ) : (
@@ -228,25 +231,34 @@ export default function Encomendas() {
                                     <p className="text-sm text-gray-600 truncate">Origem: {enc.origem} • AP {enc.apartamento}</p>
                                     <p className="text-xs text-gray-400">{new Date(enc.data_chegada).toLocaleString()}</p>
                                 </div>
-
-                                <div className="flex flex-col gap-2">
-                                    <Button size="sm" className="bg-blue-600 hover:bg-blue-700 h-8" onClick={() => handleBaixa(enc.id, enc.token)}>
-                                        BAIXA
-                                    </Button>
-                                    <Button size="icon" variant="ghost" className="h-8 w-8 text-red-500 hover:bg-red-50" onClick={async () => {
-                                        if (confirm("Excluir encomenda?")) {
-                                            await removerEncomenda(enc.id);
-                                            carregarDados();
-                                        }
-                                    }}>
-                                        <Trash2 size={16} />
-                                    </Button>
-                                </div>
                             </CardContent>
+                            {/* Actions outside onClick to avoid triggering modal */}
+                            <div className="flex flex-col gap-2 p-2 pt-0 z-10">
+                                <Button size="sm" className="bg-blue-600 hover:bg-blue-700 h-8" onClick={(e) => { e.stopPropagation(); handleBaixa(enc.id, enc.token); }}>
+                                    BAIXA
+                                </Button>
+                                <Button size="icon" variant="ghost" className="h-8 w-8 text-red-500 hover:bg-red-50" onClick={async (e) => {
+                                    e.stopPropagation();
+                                    if (confirm("Excluir encomenda?")) {
+                                        await removerEncomenda(enc.id);
+                                        carregarDados();
+                                    }
+                                }}>
+                                    <Trash2 size={16} />
+                                </Button>
+                            </div>
                         </Card>
                     ))}
                 </div>
             </div>
+
+            <DetailsModal
+                isOpen={!!itemDetalhes}
+                onClose={() => setItemDetalhes(null)}
+                title="Detalhes da Encomenda"
+                data={itemDetalhes}
+                type="encomenda"
+            />
         </div>
     );
 }

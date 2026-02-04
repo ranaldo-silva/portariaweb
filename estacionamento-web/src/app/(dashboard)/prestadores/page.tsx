@@ -7,8 +7,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Search, HardHat, Camera } from 'lucide-react';
 
+import { Trash2 } from 'lucide-react';
+import { DetailsModal } from '@/components/DetailsModal';
+
 export default function Prestadores() {
-    const { salvarPrestador, getPrestadores } = useStorage();
+    const { salvarPrestador, getPrestadores, removerPrestador } = useStorage();
 
     const [nome, setNome] = useState('');
     const [documento, setDocumento] = useState('');
@@ -20,6 +23,7 @@ export default function Prestadores() {
 
     const [lista, setLista] = useState<any[]>([]);
     const [pesquisa, setPesquisa] = useState('');
+    const [itemDetalhes, setItemDetalhes] = useState<any>(null); // Details state
 
     const tiposComuns = ["Eletricista", "Encanador", "Pedreiro", "Pintor", "Jardineiro", "Limpeza", "Outro"];
 
@@ -113,8 +117,8 @@ export default function Prestadores() {
 
                 <div className="space-y-3 max-h-[80vh] overflow-y-auto">
                     {filtrados.map(p => (
-                        <Card key={p.id} className="bg-navy border border-gray-700">
-                            <CardContent className="p-4 flex items-center gap-3">
+                        <Card key={p.id} className="bg-navy border border-gray-700 hover:bg-navy/50 cursor-pointer">
+                            <CardContent className="p-4 flex items-center gap-3" onClick={() => setItemDetalhes(p)}>
                                 {p.foto_url ? (
                                     <img src={p.foto_url} className="w-12 h-12 rounded-full object-cover border border-gold" />
                                 ) : (
@@ -122,16 +126,38 @@ export default function Prestadores() {
                                         <HardHat className="text-gold" />
                                     </div>
                                 )}
-                                <div>
+                                <div className="flex-1">
                                     <h4 className="font-bold text-white">{p.nome}</h4>
                                     <p className="text-sm text-gold">{p.tipo_servico}</p>
                                     <p className="text-xs text-gray-400">Doc: {p.documento || "---"}</p>
                                 </div>
+                                <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    className="h-8 w-8 text-red-500 hover:bg-red-50"
+                                    onClick={async (e) => {
+                                        e.stopPropagation();
+                                        if (confirm("Excluir Prestador?")) {
+                                            await removerPrestador(p.id);
+                                            carregar();
+                                        }
+                                    }}
+                                >
+                                    <Trash2 size={16} />
+                                </Button>
                             </CardContent>
                         </Card>
                     ))}
                 </div>
             </div>
+
+            <DetailsModal
+                isOpen={!!itemDetalhes}
+                onClose={() => setItemDetalhes(null)}
+                title="Detalhes do Prestador"
+                data={itemDetalhes}
+                type="prestador"
+            />
         </div>
     );
 }

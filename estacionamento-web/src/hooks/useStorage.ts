@@ -460,6 +460,20 @@ export const useStorage = () => {
         } catch { return false; }
     };
 
+    const removerPrestador = async (id: string) => {
+        try {
+            const { error } = await supabase.from('prestadores').delete().eq('id', id);
+            return !error;
+        } catch { return false; }
+    };
+
+    const removerVisita = async (id: string) => {
+        try {
+            const { error } = await supabase.from('visitas').delete().eq('id', id);
+            return !error;
+        } catch { return false; }
+    };
+
     return {
         sincronizarMoradores, salvarMoradorBase, getMoradoresBase,
         getVeiculos, salvarVeiculo, removerVeiculo, getHistorico, limparHistorico, limparAtivos,
@@ -467,6 +481,7 @@ export const useStorage = () => {
         salvarPrestador, registrarVisita, getPrestadores, getVisitas,
         enviarAlerta, getAlertas, removerAlerta, editarAlerta,
         salvarPlantao, getPlantao, getHistoricoPlantoes,
-        loginAdmin, cadastroAdmin, removerMoradorBase
+        loginAdmin, cadastroAdmin, removerMoradorBase,
+        removerPrestador, removerVisita
     };
 };
