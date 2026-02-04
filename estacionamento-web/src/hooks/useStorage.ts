@@ -25,14 +25,23 @@ export const useStorage = () => {
         try {
             // Always try to sync first on web to get fresh data
             const dados = await sincronizarMoradores();
-            return dados.map((m: any) => ({
-                ...m,
-                placa_exibicao: m.carro_detalhes?.split(',')[1]?.trim() || m.carro_detalhes || "---",
-                veiculo_modelo: m.carro_detalhes || "",
-                moto_detalhes: String(m.moto_detalhes || ""),
-                lista_moradores: String(m.lista_moradores || m.dependentes || ""), // Added fallback just in case
-                whatsapp: String(m.whatsapp || "")
-            }));
+            return dados.map((m: any) => {
+                // Combine car and moto details for robust searching
+                const carro = m.carro_detalhes || "";
+                const moto = m.moto_detalhes || "";
+                const buscaVeiculos = (carro + " " + moto).toUpperCase();
+
+                return {
+                    ...m,
+                    // Use the combined string for regex/includes search
+                    placa_exibicao: buscaVeiculos,
+                    veiculo_modelo: carro,
+                    moto_detalhes: moto,
+                    // Try common variations just in case
+                    lista_moradores: String(m.lista_moradores || m.lista_morador || m.dependentes || ""),
+                    whatsapp: String(m.whatsapp || "")
+                };
+            });
         } catch (e) { return []; }
     };
 

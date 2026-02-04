@@ -59,7 +59,7 @@ function NovoVeiculoContent() {
                     }));
                 }
             }
-        }, 500); // 500ms delay
+        }, 300); // 300ms delay
 
         return () => clearTimeout(timer);
     }, [form.placa, moradores]);
