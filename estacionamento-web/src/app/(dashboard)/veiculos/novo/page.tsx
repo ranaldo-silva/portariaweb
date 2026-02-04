@@ -6,7 +6,7 @@ import { useStorage } from '@/hooks/useStorage';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea'; // Assuming Textarea component exists or use Input for now
+// Textarea import removed to fix build error
 import { ArrowLeft, CheckCircle, AlertTriangle, MessageCircle, Phone } from 'lucide-react';
 
 function NovoVeiculoContent() {
