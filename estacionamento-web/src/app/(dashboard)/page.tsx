@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
-import { Search, Bike, user as UserIcon, Package, Car, X, LogIn } from 'lucide-react';
+import { Search, Bike, User as UserIcon, Package, Car, X, LogIn } from 'lucide-react';
 
 export default function Dashboard() {
     const router = useRouter();

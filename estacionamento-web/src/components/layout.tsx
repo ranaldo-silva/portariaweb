@@ -16,7 +16,7 @@ import {
     LogOut,
     Menu
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 
 const menuItems = [
@@ -35,8 +35,13 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     const pathname = usePathname();
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-    // Mock role check (Replace with real context)
-    const role = typeof window !== 'undefined' ? localStorage.getItem('userRole') : null;
+    // Hydration fix: Initialize with null (server state), update on client
+    const [role, setRole] = useState<string | null>(null);
+
+    useEffect(() => {
+        const userRole = localStorage.getItem('userRole');
+        setRole(userRole);
+    }, []);
 
     const filteredMenu = menuItems.filter(item => !item.admin || role === 'admin');
 
