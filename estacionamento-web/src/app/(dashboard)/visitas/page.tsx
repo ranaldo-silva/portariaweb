@@ -1,7 +1,13 @@
 "use client";
 
-import { useRef, useEffect } from 'react';
-import { Trash2 } from 'lucide-react';
+"use client";
+
+import { useState, useRef, useEffect } from 'react';
+import { useStorage } from '@/hooks/useStorage';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { UserCog, Camera, Trash2 } from 'lucide-react';
 import { DetailsModal } from '@/components/DetailsModal';
 
 export default function Visitas() {
