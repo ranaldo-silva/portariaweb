@@ -1,0 +1,137 @@
+"use client";
+
+import { useState, useEffect, useRef } from 'react';
+import { useStorage } from '@/hooks/useStorage';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Search, HardHat, Camera } from 'lucide-react';
+
+export default function Prestadores() {
+    const { salvarPrestador, getPrestadores } = useStorage();
+
+    const [nome, setNome] = useState('');
+    const [documento, setDocumento] = useState('');
+    const [tipo, setTipo] = useState('');
+    const [telefone, setTelefone] = useState('');
+    const [fotoFile, setFotoFile] = useState<File | null>(null);
+    const [docFile, setDocFile] = useState<File | null>(null);
+    const [loading, setLoading] = useState(false);
+
+    const [lista, setLista] = useState<any[]>([]);
+    const [pesquisa, setPesquisa] = useState('');
+
+    const tiposComuns = ["Eletricista", "Encanador", "Pedreiro", "Pintor", "Jardineiro", "Limpeza", "Outro"];
+
+    const carregar = async () => {
+        const dados = await getPrestadores();
+        setLista(dados || []);
+    };
+    useEffect(() => { carregar(); }, []);
+
+    const handleSalvar = async () => {
+        if (!nome || !tipo) return alert("Nome e Tipo obrigatórios");
+        setLoading(true);
+
+        const dados = { nome, tipo, telefone, documento, fotoFile, docFile };
+        const ok = await salvarPrestador(dados);
+
+        if (ok) {
+            alert("Cadastrado!");
+            setNome(''); setDocumento(''); setTipo(''); setTelefone(''); setFotoFile(null); setDocFile(null);
+            carregar();
+        } else {
+            alert("Erro ao salvar.");
+        }
+        setLoading(false);
+    };
+
+    const filtrados = lista.filter(p =>
+        p.nome?.toLowerCase().includes(pesquisa.toLowerCase()) ||
+        p.documento?.includes(pesquisa)
+    );
+
+    return (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Card className="bg-navy-light border-gold h-fit">
+                <CardHeader>
+                    <CardTitle className="text-gold flex items-center gap-2"><HardHat /> Cadastro Prestador</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    <Input placeholder="Nome Completo" value={nome} onChange={e => setNome(e.target.value)} className="bg-white text-black" />
+                    <Input placeholder="Documento (RG/CPF)" value={documento} onChange={e => setDocumento(e.target.value)} className="bg-white text-black" />
+
+                    <div>
+                        <p className="text-sm text-gray-300 mb-2">Tipo de Serviço:</p>
+                        <div className="flex flex-wrap gap-2">
+                            {tiposComuns.map(t => (
+                                <Button
+                                    key={t}
+                                    size="sm"
+                                    variant={tipo === t ? "default" : "outline"}
+                                    onClick={() => setTipo(t)}
+                                    className={tipo === t ? "bg-white text-black" : "text-gray-300 border-gray-600"}
+                                >
+                                    {t}
+                                </Button>
+                            ))}
+                        </div>
+                    </div>
+
+                    <Input placeholder="Telefone" value={telefone} onChange={e => setTelefone(e.target.value)} className="bg-white text-black" />
+
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="border border-dashed border-gold/50 rounded p-4 text-center cursor-pointer hover:bg-navy/50 relative">
+                            <input type="file" accept="image/*" capture="user" className="absolute inset-0 opacity-0 cursor-pointer" onChange={e => e.target.files && setFotoFile(e.target.files[0])} />
+                            <Camera className="mx-auto text-gold mb-2" />
+                            <p className="text-xs text-gray-400">{fotoFile ? "Foto selecionada" : "Foto Rosto"}</p>
+                        </div>
+                        <div className="border border-dashed border-gold/50 rounded p-4 text-center cursor-pointer hover:bg-navy/50 relative">
+                            <input type="file" accept="image/*" capture="environment" className="absolute inset-0 opacity-0 cursor-pointer" onChange={e => e.target.files && setDocFile(e.target.files[0])} />
+                            <Camera className="mx-auto text-gold mb-2" />
+                            <p className="text-xs text-gray-400">{docFile ? "Doc selecionado" : "Foto Doc"}</p>
+                        </div>
+                    </div>
+
+                    <Button className="w-full bg-gold text-navy font-bold" onClick={handleSalvar} disabled={loading}>
+                        {loading ? "SALVANDO..." : "CADASTRAR"}
+                    </Button>
+                </CardContent>
+            </Card>
+
+            {/* LISTA */}
+            <div className="space-y-4">
+                <div className="relative">
+                    <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-500" />
+                    <Input
+                        placeholder="Buscar prestador..."
+                        value={pesquisa}
+                        onChange={e => setPesquisa(e.target.value)}
+                        className="pl-9 bg-navy-light border-gold/30 text-white placeholder:text-gray-400"
+                    />
+                </div>
+
+                <div className="space-y-3 max-h-[80vh] overflow-y-auto">
+                    {filtrados.map(p => (
+                        <Card key={p.id} className="bg-navy border border-gray-700">
+                            <CardContent className="p-4 flex items-center gap-3">
+                                {p.foto_url ? (
+                                    <img src={p.foto_url} className="w-12 h-12 rounded-full object-cover border border-gold" />
+                                ) : (
+                                    <div className="w-12 h-12 rounded-full bg-navy-light flex items-center justify-center border border-gold">
+                                        <HardHat className="text-gold" />
+                                    </div>
+                                )}
+                                <div>
+                                    <h4 className="font-bold text-white">{p.nome}</h4>
+                                    <p className="text-sm text-gold">{p.tipo_servico}</p>
+                                    <p className="text-xs text-gray-400">Doc: {p.documento || "---"}</p>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    ))}
+                </div>
+            </div>
+        </div>
+    );
+}
