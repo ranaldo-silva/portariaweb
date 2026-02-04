@@ -23,15 +23,14 @@ export const useStorage = () => {
 
     const getMoradoresBase = async () => {
         try {
-            const res = localStorage.getItem('moradores_cache');
-            if (!res) return await sincronizarMoradores();
-            const dados = JSON.parse(res);
+            // Always try to sync first on web to get fresh data
+            const dados = await sincronizarMoradores();
             return dados.map((m: any) => ({
                 ...m,
                 placa_exibicao: m.carro_detalhes?.split(',')[1]?.trim() || m.carro_detalhes || "---",
                 veiculo_modelo: m.carro_detalhes || "",
                 moto_detalhes: String(m.moto_detalhes || ""),
-                lista_moradores: String(m.lista_moradores || ""),
+                lista_moradores: String(m.lista_moradores || m.dependentes || ""), // Added fallback just in case
                 whatsapp: String(m.whatsapp || "")
             }));
         } catch (e) { return []; }

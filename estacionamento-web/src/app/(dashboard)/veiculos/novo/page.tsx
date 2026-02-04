@@ -37,41 +37,48 @@ function NovoVeiculoContent() {
         load();
     }, [getMoradoresBase]);
 
+    // Debounce search logic
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            if (form.placa.length >= 3) {
+                const placaUpper = form.placa.toUpperCase();
+                const encontrado = moradores.find((m: any) => {
+                    const pExibicao = String(m.placa_exibicao || "").toUpperCase();
+                    return pExibicao.includes(placaUpper);
+                });
+
+                if (encontrado) {
+                    setForm(prev => ({
+                        ...prev,
+                        proprietario: String(encontrado.nome_responsavel || ""),
+                        modelo: String(encontrado.carro_detalhes || encontrado.moto_detalhes || ""),
+                        apartamento: String(encontrado.apartamento || ""),
+                        bloco: String(encontrado.bloco || ""),
+                        dependentes: String(encontrado.lista_moradores || "Nenhum dependente"),
+                        whatsapp: String(encontrado.whatsapp || "")
+                    }));
+                }
+            }
+        }, 500); // 500ms delay
+
+        return () => clearTimeout(timer);
+    }, [form.placa, moradores]);
+
     const handlePlacaChange = (texto: string) => {
         const placaUpper = texto.toUpperCase();
-
-        let novoForm = {
-            ...form,
+        // Just update the input, let useEffect handle search
+        setForm(prev => ({
+            ...prev,
             placa: placaUpper,
+            // Reset fields on change if you want, or keep them until new match. 
+            // Clearing them here makes it obvious when a match is lost/searching.
             proprietario: '',
             modelo: '',
             apartamento: '',
             bloco: '',
             dependentes: '',
             whatsapp: ''
-        };
-
-        if (placaUpper.length >= 3) {
-            const encontrado = moradores.find((m: any) => {
-                const pExibicao = String(m.placa_exibicao || "").toUpperCase();
-                return pExibicao.includes(placaUpper);
-            });
-
-            if (encontrado) {
-                novoForm = {
-                    ...novoForm,
-                    placa: String(encontrado.placa_exibicao || placaUpper),
-                    proprietario: String(encontrado.nome_responsavel || ""),
-                    modelo: String(encontrado.carro_detalhes || encontrado.moto_detalhes || ""),
-                    apartamento: String(encontrado.apartamento || ""),
-                    bloco: String(encontrado.bloco || ""),
-                    dependentes: String(encontrado.lista_moradores || "Nenhum dependente"),
-                    whatsapp: String(encontrado.whatsapp || "")
-                };
-            }
-        }
-
-        setForm(novoForm);
+        }));
     };
 
     const confirmarEntrada = async () => {
