@@ -3,12 +3,13 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useStorage } from '@/hooks/useStorage';
+import { supabase } from '@/lib/supabase';
 import { differenceInHours, parseISO } from 'date-fns';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
-import { Search, Bike, User as UserIcon, Package, Car, X, LogIn } from 'lucide-react';
+import { Search, Bike, User as UserIcon, Package, Car, X, LogIn, AlertTriangle } from 'lucide-react';
 
 import { DetailsModal } from '@/components/DetailsModal';
 
@@ -25,6 +26,8 @@ export default function Dashboard() {
     const [itemDetalhes, setItemDetalhes] = useState<any>(null); // New state for modal
     const [filtroMoto, setFiltroMoto] = useState(false);
     const [filtroBloco, setFiltroBloco] = useState(''); // '' = Todos
+
+    const [novoAlerta, setNovoAlerta] = useState<any>(null); // State for realtime alert
 
     const carregarDados = async () => {
         setLoading(true);
@@ -44,7 +47,27 @@ export default function Dashboard() {
         }
     };
 
-    useEffect(() => { carregarDados(); }, []);
+    useEffect(() => {
+        carregarDados();
+
+        // Realtime Subscription for Alerts
+        const channel = supabase
+            .channel('alertas-realtime')
+            .on(
+                'postgres_changes',
+                { event: 'INSERT', schema: 'public', table: 'alertas_comunidade' },
+                (payload) => {
+                    console.log('Novo Alerta Recebido:', payload);
+                    setNovoAlerta(payload.new);
+                    // Optional: Play sound here if desired in future
+                }
+            )
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
+    }, []);
 
     const verificarExcesso = (dataEntrada: string) => {
         const horas = differenceInHours(new Date(), parseISO(dataEntrada));
@@ -236,6 +259,43 @@ export default function Dashboard() {
                 data={itemDetalhes}
                 type="morador"
             />
+            {/* NEW ALERT REALTIME MODAL */}
+            {novoAlerta && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 backdrop-blur p-4 animate-in theme-red">
+                    <Card className="w-full max-w-2xl bg-red-900 border-4 border-red-500 shadow-[0_0_50px_rgba(239,68,68,0.5)] animate-pulse">
+                        <CardHeader className="text-center border-b border-red-500/50 pb-6">
+                            <div className="flex justify-center mb-4">
+                                <AlertTriangle size={80} className="text-white animate-bounce" />
+                            </div>
+                            <CardTitle className="text-4xl font-black text-white uppercase tracking-widest">
+                                {novoAlerta.titulo}
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="p-8 text-center space-y-6">
+                            <div className="bg-black/40 p-6 rounded-xl border border-red-500/30">
+                                <p className="text-2xl text-white font-bold leading-relaxed">
+                                    {novoAlerta.descricao}
+                                </p>
+                            </div>
+
+                            <div className="flex justify-center flex-col items-center gap-2">
+                                <p className="text-red-200 font-mono text-sm">
+                                    {new Date(novoAlerta.data_hora).toLocaleString()} - {novoAlerta.autor}
+                                </p>
+                                <p className="text-xs text-red-300">Este alerta foi emitido em tempo real</p>
+                            </div>
+
+                            <Button
+                                size="lg"
+                                className="w-full h-16 text-xl font-bold bg-white text-red-900 hover:bg-gray-200 hover:scale-105 transition-all"
+                                onClick={() => setNovoAlerta(null)}
+                            >
+                                CIENTE, FECHAR ALERTA
+                            </Button>
+                        </CardContent>
+                    </Card>
+                </div>
+            )}
         </div>
     );
 }

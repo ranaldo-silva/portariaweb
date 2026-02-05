@@ -49,10 +49,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         <div className="flex h-screen bg-navy text-white overflow-hidden">
             {/* Sidebar Desktop */}
             <aside className="hidden md:flex flex-col w-64 bg-navy-light border-r border-gold/20">
-                <div className="p-6 border-b border-gold/20">
+                <Link href="/" className="block p-6 border-b border-gold/20 hover:bg-navy/50 transition-colors">
                     <h1 className="text-xl font-bold text-gold">Portaria Web</h1>
                     <p className="text-xs text-gray-400">Sistema Integrado</p>
-                </div>
+                </Link>
 
                 <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
                     {filteredMenu.map((item) => (
@@ -89,7 +89,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             {/* Mobile Header */}
             <div className="flex-1 flex flex-col h-full overflow-hidden">
                 <header className="md:hidden flex items-center justify-between p-4 bg-navy-light border-b border-gold/20">
-                    <h1 className="text-lg font-bold text-gold">Portaria Web</h1>
+                    <Link href="/">
+                        <h1 className="text-lg font-bold text-gold">Portaria Web</h1>
+                    </Link>
                     <Button variant="ghost" size="icon" onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}>
                         <Menu size={24} className="text-gold" />
                     </Button>

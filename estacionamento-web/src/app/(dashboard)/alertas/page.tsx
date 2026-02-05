@@ -18,7 +18,11 @@ export default function Alertas() {
     const [customDesc, setCustomDesc] = useState('');
     const [showCustom, setShowCustom] = useState(false);
 
-    useEffect(() => { carregar(); }, []);
+    useEffect(() => {
+        carregar();
+        const nomeSalvo = localStorage.getItem('nome_condominio');
+        if (nomeSalvo) setNomeCondominio(nomeSalvo);
+    }, []);
 
     const carregar = async () => {
         setLoading(true);
@@ -57,6 +61,24 @@ export default function Alertas() {
 
     return (
         <div className="max-w-4xl mx-auto space-y-6">
+            <Card className="bg-navy-light border-gold">
+                <CardHeader><CardTitle className="text-gold">Configuração de Origem</CardTitle></CardHeader>
+                <CardContent>
+                    <div className="flex gap-4 items-center">
+                        <Input
+                            className="bg-white text-black"
+                            placeholder="Nome do Condomínio (Ex: Portaria Principal)"
+                            value={nomeCondominio}
+                            onChange={(e) => {
+                                setNomeCondominio(e.target.value);
+                                localStorage.setItem('nome_condominio', e.target.value);
+                            }}
+                        />
+                    </div>
+                    <p className="text-xs text-gray-400 mt-2">Este nome aparecerá como autor dos alertas enviados.</p>
+                </CardContent>
+            </Card>
+
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <Button
                     variant="outline"
