@@ -1,50 +1,12 @@
 import { supabase } from '@/lib/supabase';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 
 // --- TYPES ---
 // (We can extract these to a types file later)
 
 export const useStorage = () => {
 
-    // --- MORADORES ---
-    const sincronizarMoradores = async () => {
-        try {
-            const { data, error } = await supabase.from('moradores').select('*').order('apartamento', { ascending: true });
-            if (error) throw error;
-            // Web is always online usually, we can skip localStorage cache for now or add it if needed
-            if (data) localStorage.setItem('moradores_cache', JSON.stringify(data));
-            return data || [];
-        } catch (e) {
-            console.error(e);
-            const local = localStorage.getItem('moradores_cache');
-            return local ? JSON.parse(local) : [];
-        }
-    };
-
-    const getMoradoresBase = async () => {
-        try {
-            // Always try to sync first on web to get fresh data
-            const dados = await sincronizarMoradores();
-            return dados.map((m: any) => {
-                // Combine car and moto details for robust searching
-                const carro = m.carro_detalhes || "";
-                const moto = m.moto_detalhes || "";
-                const buscaVeiculos = (carro + " " + moto).toUpperCase();
-
-                return {
-                    ...m,
-                    // Use the combined string for regex/includes search
-                    placa_exibicao: buscaVeiculos,
-                    veiculo_modelo: carro,
-                    moto_detalhes: moto,
-                    // Try common variations just in case
-                    lista_moradores: String(m.lista_moradores || m.lista_morador || m.dependentes || ""),
-                    whatsapp: String(m.whatsapp || "")
-                };
-            });
-        } catch (e) { return []; }
-    };
-
+    // --- HELPERS (Memoized or internal) ---
     const formatarNomeProprio = (texto: any) => {
         if (!texto || typeof texto !== 'string') return "";
         const excessoes = ["de", "da", "do", "das", "dos", "e"];
@@ -73,7 +35,57 @@ export const useStorage = () => {
         return texto.length <= 8 ? texto.toUpperCase() : formatarNomeProprio(texto);
     };
 
-    const salvarMoradorBase = async (morador: any) => {
+    // --- MORADORES ---
+    // CACHE LOGIC: 5 minutes validity
+    const sincronizarMoradores = useCallback(async (force = false) => {
+        try {
+            const CACHE_KEY = 'moradores_cache';
+            const TIME_KEY = 'moradores_sync_time';
+            const CACHE_DURATION = 1000 * 60 * 5; // 5 minutes
+
+            const local = localStorage.getItem(CACHE_KEY);
+            const lastSync = localStorage.getItem(TIME_KEY);
+            const now = Date.now();
+
+            if (!force && local && lastSync && (now - Number(lastSync) < CACHE_DURATION)) {
+                return JSON.parse(local);
+            }
+
+            const { data, error } = await supabase.from('moradores').select('*').order('apartamento', { ascending: true });
+            if (error) throw error;
+
+            if (data) {
+                localStorage.setItem(CACHE_KEY, JSON.stringify(data));
+                localStorage.setItem(TIME_KEY, String(now));
+            }
+            return data || [];
+        } catch (e) {
+            console.error(e);
+            return [];
+        }
+    }, []);
+
+    const getMoradoresBase = useCallback(async () => {
+        try {
+            const dados = await sincronizarMoradores();
+            return dados.map((m: any) => {
+                const carro = m.carro_detalhes || "";
+                const moto = m.moto_detalhes || "";
+                const buscaVeiculos = (carro + " " + moto).toUpperCase();
+
+                return {
+                    ...m,
+                    placa_exibicao: buscaVeiculos,
+                    veiculo_modelo: carro,
+                    moto_detalhes: moto,
+                    lista_moradores: String(m.lista_moradores || m.lista_morador || m.dependentes || ""),
+                    whatsapp: String(m.whatsapp || "")
+                };
+            });
+        } catch (e) { return []; }
+    }, [sincronizarMoradores]);
+
+    const salvarMoradorBase = useCallback(async (morador: any) => {
         try {
             const { error } = await supabase.from('moradores').upsert({
                 id: morador.id || undefined,
@@ -87,13 +99,13 @@ export const useStorage = () => {
                 cpf: (morador.cpf || "").replace(/\D/g, ""),
             });
             if (error) throw error;
-            await sincronizarMoradores();
+            await sincronizarMoradores(true);
             return true;
         } catch (e) { return false; }
-    };
+    }, [sincronizarMoradores]);
 
     // --- VEÍCULOS E VAGAS ---
-    const getVeiculos = async () => {
+    const getVeiculos = useCallback(async () => {
         try {
             const { data, error } = await supabase.from('vagas_ocupadas').select('*');
             if (error) throw error;
@@ -108,9 +120,9 @@ export const useStorage = () => {
                 dataEntrada: v.data_entrada
             })) || [];
         } catch (e) { return []; }
-    };
+    }, []);
 
-    const salvarVeiculo = async (v: any) => {
+    const salvarVeiculo = useCallback(async (v: any) => {
         try {
             const identificacaoComp = `${formatarNomeProprio(v.modelo)} | ${(v.placa || "").toUpperCase()}`;
             const { error } = await supabase.from('vagas_ocupadas').insert([{
@@ -123,9 +135,9 @@ export const useStorage = () => {
             }]);
             return !error;
         } catch { return false; }
-    };
+    }, []);
 
-    const removerVeiculo = async (veiculo: any) => {
+    const removerVeiculo = useCallback(async (veiculo: any) => {
         try {
             const { error: insertError } = await supabase.from('historico_vagas').insert([{
                 placa: `${veiculo.veiculo_nome} | ${veiculo.placa}`,
@@ -148,9 +160,9 @@ export const useStorage = () => {
             console.error(e);
             return false;
         }
-    };
+    }, []);
 
-    const getHistorico = async () => {
+    const getHistorico = useCallback(async () => {
         try {
             const { data, error } = await supabase.from('historico_vagas').select('*').order('data_saida', { ascending: false });
             if (error) throw error;
@@ -165,25 +177,25 @@ export const useStorage = () => {
                 dataSaida: h.data_saida
             })) || [];
         } catch (e) { return []; }
-    };
+    }, []);
 
-    const limparHistorico = async () => {
+    const limparHistorico = useCallback(async () => {
         try {
             const { error } = await supabase.from('historico_vagas').delete().gt('data_saida', '1970-01-01T00:00:00Z');
             return { success: !error, error: error?.message };
         } catch (e: any) {
             return { success: false, error: e.message };
         }
-    };
+    }, []);
 
-    const limparAtivos = async () => {
+    const limparAtivos = useCallback(async () => {
         try {
             const { error } = await supabase.from('vagas_ocupadas').delete().gt('data_entrada', '1970-01-01T00:00:00Z');
             return { success: !error, error: error?.message };
         } catch (e: any) {
             return { success: false, error: e.message };
         }
-    };
+    }, []);
 
     // --- ENCOMENDAS ---
     const startUpload = async (file: File | null, bucket: string) => {
@@ -203,7 +215,7 @@ export const useStorage = () => {
         }
     };
 
-    const registrarEncomenda = async (morador: any, origem: string, token: string, file: File | null) => {
+    const registrarEncomenda = useCallback(async (morador: any, origem: string, token: string, file: File | null) => {
         try {
             let urlPublica = "";
             if (file) {
@@ -224,9 +236,9 @@ export const useStorage = () => {
         } catch (e) {
             return false;
         }
-    };
+    }, []);
 
-    const getEncomendasAtivas = async () => {
+    const getEncomendasAtivas = useCallback(async () => {
         try {
             const { data } = await supabase
                 .from('encomendas')
@@ -235,9 +247,9 @@ export const useStorage = () => {
                 .order('data_chegada', { ascending: false });
             return data || [];
         } catch { return []; }
-    };
+    }, []);
 
-    const getTodasEncomendas = async () => {
+    const getTodasEncomendas = useCallback(async () => {
         try {
             const { data } = await supabase
                 .from('encomendas')
@@ -245,9 +257,9 @@ export const useStorage = () => {
                 .order('data_chegada', { ascending: false });
             return data || [];
         } catch { return []; }
-    };
+    }, []);
 
-    const validarTokenRetirada = async (tokenId: string, input: string) => {
+    const validarTokenRetirada = useCallback(async (tokenId: string, input: string) => {
         try {
             const { data: enc, error } = await supabase
                 .from('encomendas')
@@ -279,17 +291,17 @@ export const useStorage = () => {
                 .from('encomendas').update({ status: 'Retirado', data_retirada: new Date().toISOString() }).eq('id', tokenId);
             return { sucesso: !updateError, msg: updateError ? "Erro no servidor" : "Retirada confirmada!" };
         } catch { return { sucesso: false, msg: "Erro de conexão" }; }
-    };
+    }, []);
 
-    const removerEncomenda = async (id: string) => {
+    const removerEncomenda = useCallback(async (id: string) => {
         try {
             const { error } = await supabase.from('encomendas').delete().eq('id', id);
             return !error;
         } catch { return false; }
-    };
+    }, []);
 
     // --- PRESTADORES ---
-    const salvarPrestador = async (dados: any) => {
+    const salvarPrestador = useCallback(async (dados: any) => {
         try {
             const fotoUrl = dados.fotoFile ? await startUpload(dados.fotoFile, 'prestadores') : "";
             const docUrl = dados.docFile ? await startUpload(dados.docFile, 'prestadores') : "";
@@ -310,17 +322,17 @@ export const useStorage = () => {
             }
             return true;
         } catch (e) { return false; }
-    };
+    }, []);
 
-    const getPrestadores = async () => {
+    const getPrestadores = useCallback(async () => {
         try {
             const { data } = await supabase.from('prestadores').select('*').order('data_cadastro', { ascending: false });
             return data || [];
         } catch { return []; }
-    };
+    }, []);
 
     // --- VISITAS ---
-    const registrarVisita = async (dados: any) => {
+    const registrarVisita = useCallback(async (dados: any) => {
         try {
             const fotoUrl = dados.fotoFile ? await startUpload(dados.fotoFile, 'visitas') : "";
 
@@ -335,17 +347,17 @@ export const useStorage = () => {
 
             return !error;
         } catch (e) { return false; }
-    };
+    }, []);
 
-    const getVisitas = async () => {
+    const getVisitas = useCallback(async () => {
         try {
             const { data } = await supabase.from('visitas').select('*').order('data_visita', { ascending: false });
             return data || [];
         } catch { return []; }
-    };
+    }, []);
 
     // --- ALERTAS ---
-    const enviarAlerta = async (dados: { tipo: string, titulo: string, descricao: string, autor: string }) => {
+    const enviarAlerta = useCallback(async (dados: { tipo: string, titulo: string, descricao: string, autor: string }) => {
         try {
             const { error } = await supabase.from('alertas_comunidade').insert([{
                 tipo: dados.tipo,
@@ -356,9 +368,9 @@ export const useStorage = () => {
             }]);
             return !error;
         } catch { return false; }
-    };
+    }, []);
 
-    const getAlertas = async () => {
+    const getAlertas = useCallback(async () => {
         try {
             const ontem = new Date();
             ontem.setDate(ontem.getDate() - 1);
@@ -372,16 +384,16 @@ export const useStorage = () => {
             if (error) return [];
             return data;
         } catch { return []; }
-    };
+    }, []);
 
-    const removerAlerta = async (id: string) => {
+    const removerAlerta = useCallback(async (id: string) => {
         try {
             const { error } = await supabase.from('alertas_comunidade').delete().eq('id', id);
             return !error;
         } catch { return false; }
-    };
+    }, []);
 
-    const editarAlerta = async (id: string, novoTitulo: string, novaDescricao: string) => {
+    const editarAlerta = useCallback(async (id: string, novoTitulo: string, novaDescricao: string) => {
         try {
             const { error } = await supabase.from('alertas_comunidade').update({
                 titulo: novoTitulo,
@@ -389,10 +401,10 @@ export const useStorage = () => {
             }).eq('id', id);
             return !error;
         } catch { return false; }
-    };
+    }, []);
 
     // --- PLANTAO ---
-    const salvarPlantao = async (dados: any) => {
+    const salvarPlantao = useCallback(async (dados: any) => {
         try {
             const { error } = await supabase.from('livro_plantao').upsert({
                 data: dados.data,
@@ -405,9 +417,9 @@ export const useStorage = () => {
             }, { onConflict: 'data, turno' });
             return !error;
         } catch { return false; }
-    };
+    }, []);
 
-    const getPlantao = async (data: string, turno: string) => {
+    const getPlantao = useCallback(async (data: string, turno: string) => {
         try {
             const { data: res } = await supabase
                 .from('livro_plantao')
@@ -417,9 +429,9 @@ export const useStorage = () => {
                 .single();
             return res || null;
         } catch { return null; }
-    };
+    }, []);
 
-    const getHistoricoPlantoes = async () => {
+    const getHistoricoPlantoes = useCallback(async () => {
         try {
             const { data } = await supabase
                 .from('livro_plantao')
@@ -428,10 +440,10 @@ export const useStorage = () => {
                 .limit(30);
             return data || [];
         } catch { return []; }
-    };
+    }, []);
 
     // --- AUTH ---
-    const loginAdmin = async (email: string, senha: string) => {
+    const loginAdmin = useCallback(async (email: string, senha: string) => {
         try {
             const { data, error } = await supabase
                 .from('admins')
@@ -443,36 +455,36 @@ export const useStorage = () => {
             if (error || !data) return false;
             return true;
         } catch { return false; }
-    };
+    }, []);
 
-    const cadastroAdmin = async (email: string, senha: string) => {
+    const cadastroAdmin = useCallback(async (email: string, senha: string) => {
         try {
             const { error } = await supabase.from('admins').insert([{ email: email.trim(), senha: senha.trim() }]);
             return !error;
         } catch { return false; }
-    };
+    }, []);
 
-    const removerMoradorBase = async (id: string) => {
+    const removerMoradorBase = useCallback(async (id: string) => {
         try {
             const { error } = await supabase.from('moradores').delete().eq('id', id);
-            if (!error) await sincronizarMoradores();
+            if (!error) await sincronizarMoradores(true);
             return !error;
         } catch { return false; }
-    };
+    }, [sincronizarMoradores]);
 
-    const removerPrestador = async (id: string) => {
+    const removerPrestador = useCallback(async (id: string) => {
         try {
             const { error } = await supabase.from('prestadores').delete().eq('id', id);
             return !error;
         } catch { return false; }
-    };
+    }, []);
 
-    const removerVisita = async (id: string) => {
+    const removerVisita = useCallback(async (id: string) => {
         try {
             const { error } = await supabase.from('visitas').delete().eq('id', id);
             return !error;
         } catch { return false; }
-    };
+    }, []);
 
     return {
         sincronizarMoradores, salvarMoradorBase, getMoradoresBase,
