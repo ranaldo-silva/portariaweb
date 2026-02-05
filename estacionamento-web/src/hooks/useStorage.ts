@@ -7,12 +7,28 @@ import { useState, useEffect } from 'react';
 export const useStorage = () => {
 
     // --- MORADORES ---
-    const sincronizarMoradores = async () => {
+    const sincronizarMoradores = async (force = false) => {
         try {
+            const CACHE_KEY = 'moradores_cache';
+            const TIME_KEY = 'moradores_sync_time';
+            const CACHE_DURATION = 1000 * 60 * 5; // 5 minutes
+
+            const local = localStorage.getItem(CACHE_KEY);
+            const lastSync = localStorage.getItem(TIME_KEY);
+            const now = Date.now();
+
+            // Return cache if valid and not forced
+            if (!force && local && lastSync && (now - Number(lastSync) < CACHE_DURATION)) {
+                return JSON.parse(local);
+            }
+
             const { data, error } = await supabase.from('moradores').select('*').order('apartamento', { ascending: true });
             if (error) throw error;
-            // Web is always online usually, we can skip localStorage cache for now or add it if needed
-            if (data) localStorage.setItem('moradores_cache', JSON.stringify(data));
+
+            if (data) {
+                localStorage.setItem(CACHE_KEY, JSON.stringify(data));
+                localStorage.setItem(TIME_KEY, String(now));
+            }
             return data || [];
         } catch (e) {
             console.error(e);
@@ -87,7 +103,7 @@ export const useStorage = () => {
                 cpf: (morador.cpf || "").replace(/\D/g, ""),
             });
             if (error) throw error;
-            await sincronizarMoradores();
+            await sincronizarMoradores(true);
             return true;
         } catch (e) { return false; }
     };
@@ -455,7 +471,7 @@ export const useStorage = () => {
     const removerMoradorBase = async (id: string) => {
         try {
             const { error } = await supabase.from('moradores').delete().eq('id', id);
-            if (!error) await sincronizarMoradores();
+            if (!error) await sincronizarMoradores(true);
             return !error;
         } catch { return false; }
     };
