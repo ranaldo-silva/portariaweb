@@ -41,7 +41,13 @@ export default function LoginMorador() {
             // Find match
             const morador = moradores?.find(m => {
                 const stored = (m.whatsapp || "").replace(/\D/g, "");
-                return stored.includes(cleanPhone) || cleanPhone.includes(stored);
+                // Must have a stored number to match
+                if (!stored || stored.length < 8) return false;
+
+                // Strict equality or suffix match (to handle 55 prefix differences)
+                // Logic: Input must equal Stored OR Input/Stored must end with same 8+ digits
+                // But safest is:
+                return stored === cleanPhone || (stored.endsWith(cleanPhone) && cleanPhone.length >= 8) || (cleanPhone.endsWith(stored) && stored.length >= 8);
             });
 
             if (morador) {
