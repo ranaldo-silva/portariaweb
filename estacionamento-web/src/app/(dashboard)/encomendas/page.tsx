@@ -26,6 +26,7 @@ export default function Encomendas() {
     const [itemDetalhes, setItemDetalhes] = useState<any>(null); // Details state
     const [tokenDigitado, setTokenDigitado] = useState('');
     const [loading, setLoading] = useState(false);
+    const [notificarWhats, setNotificarWhats] = useState(true);
 
     const origensComuns = ["Shopee", "Mercado Livre", "Shein", "Amazon", "Correios", "99Food", "KeeTa", "Transportadora"];
 
@@ -59,13 +60,18 @@ export default function Encomendas() {
         }
         setLoading(true);
         const token = Math.floor(1000 + Math.random() * 9000).toString();
-        const sucesso = await registrarEncomenda(moradorSel, origem, token, fotoFile);
+        const sucesso = await registrarEncomenda(moradorSel, origem, token, fotoFile, destinatarioFinal);
 
         if (sucesso) {
             const mensagem = `📦 *ENCOMENDA NA PORTARIA*\n\nOlá, *${destinatarioFinal}*.\nSua encomenda da *${origem}* chegou.\n\n🔐 *TOKEN PARA RETIRADA:* ${token}`;
             const url = `https://wa.me/55${moradorSel.whatsapp.replace(/\D/g, "")}?text=${encodeURIComponent(mensagem)}`;
 
-            window.open(url, '_blank');
+
+
+            if (notificarWhats) {
+                window.open(url, '_blank');
+            }
+
             setMoradorSel(null);
             setDestinatarioFinal('');
             setOrigem('');
@@ -198,13 +204,28 @@ export default function Encomendas() {
                         )}
                     </div>
 
+
+
+                    <div className="flex items-center gap-2 px-1">
+                        <input
+                            type="checkbox"
+                            id="notificar"
+                            checked={notificarWhats}
+                            onChange={(e) => setNotificarWhats(e.target.checked)}
+                            className="w-5 h-5 rounded border-gray-300 text-gold focus:ring-gold accent-gold cursor-pointer"
+                        />
+                        <label htmlFor="notificar" className="text-sm text-gray-300 cursor-pointer select-none">
+                            Enviar notificação via WhatsApp
+                        </label>
+                    </div>
+
                     <Button
                         className="w-full bg-success text-white font-bold h-12"
                         onClick={handleRegistrar}
                         disabled={loading}
                     >
                         <Send className="mr-2" size={18} />
-                        {loading ? "ENVIANDO..." : "NOTIFICAR WHATSAPP"}
+                        {loading ? "ENVIANDO..." : (notificarWhats ? "NOTIFICAR WHATSAPP" : "REGISTRAR ENCOMENDA")}
                     </Button>
                 </CardContent>
             </Card>
@@ -229,6 +250,7 @@ export default function Encomendas() {
                                 <div className="flex-1 min-w-0">
                                     <h4 className="font-bold text-navy truncate">{enc.moradores?.nome_responsavel || "Desconhecido"}</h4>
                                     <p className="text-sm text-gray-600 truncate">Origem: {enc.origem} • AP {enc.apartamento}</p>
+                                    {enc.destinatario && <p className="text-xs text-blue-600 font-bold">Para: {enc.destinatario}</p>}
                                     <p className="text-xs text-gray-400">{new Date(enc.data_chegada).toLocaleString()}</p>
                                 </div>
                             </CardContent>
@@ -259,6 +281,6 @@ export default function Encomendas() {
                 data={itemDetalhes}
                 type="encomenda"
             />
-        </div>
+        </div >
     );
 }

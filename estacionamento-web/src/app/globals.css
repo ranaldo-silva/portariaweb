@@ -1,33 +1,106 @@
 @import "tailwindcss";
 
 :root {
-  /* Brand Colors */
+  /* --- LIGHT MODE (Resident Default) --- */
+  /* Vivid Blue Theme */
+  --background: #f0f9ff; /* blue-50 */
+  --foreground: #0f172a; /* slate-900 */
+  
+  --card: #ffffff;
+  --card-foreground: #1e3a8a; /* blue-900 */
+ 
+  --popover: #ffffff;
+  --popover-foreground: #1e3a8a;
+ 
+  --primary: #2563eb; /* blue-600 */
+  --primary-foreground: #ffffff;
+ 
+  --secondary: #e0f2fe; /* blue-100 */
+  --secondary-foreground: #1e40af; /* blue-800 */
+ 
+  --muted: #f1f5f9; /* slate-100 */
+  --muted-foreground: #64748b; /* slate-500 */
+ 
+  --accent: #dbeafe; /* blue-100 */
+  --accent-foreground: #1e40af;
+ 
+  --destructive: #ef4444;
+  --destructive-foreground: #ffffff;
+
+  --border: #bfdbfe; /* blue-200 */
+  --input: #bfdbfe;
+  --ring: #2563eb;
+
+  /* Legacy Preservation */
   --color-navy: #050A30;
   --color-navy-light: #1B263B;
   --color-gold: #FFD700;
-  --color-gold-hover: #E6C200;
-  --color-white: #FFFFFF;
-  --color-error: #FF5252;
-  --color-success: #2ecc71;
+}
 
-  /* Semantic */
-  --background: var(--color-navy);
-  --foreground: var(--color-white);
-  --card: var(--color-navy-light);
-  --primary: var(--color-gold);
-  --primary-foreground: #000000;
+[data-mode="dark"] {
+  /* --- DARK MODE (Resident Option & Admin Base) --- */
+  /* Navy/Gold Theme */
+  --background: #050A30; /* navy */
+  --foreground: #FFD700; /* gold */
+ 
+  --card: #1B263B; /* navy-light */
+  --card-foreground: #e2e8f0; /* slate-200 */
+ 
+  --popover: #1B263B;
+  --popover-foreground: #e2e8f0;
+ 
+  --primary: #FFD700; /* gold */
+  --primary-foreground: #050A30;
+ 
+  --secondary: #334155; /* slate-700 */
+  --secondary-foreground: #f8fafc;
+ 
+  --muted: #1e293b; /* slate-800 */
+  --muted-foreground: #94a3b8; /* slate-400 */
+ 
+  --accent: #1e293b;
+  --accent-foreground: #f8fafc;
+ 
+  --destructive: #7f1d1d;
+  --destructive-foreground: #f8fafc;
+ 
+  --border: #334155;
+  --input: #334155;
+  --ring: #FFD700;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
+  
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
   --color-navy: var(--color-navy);
   --color-navy-light: var(--color-navy-light);
   --color-gold: var(--color-gold);
-
+   
   --font-sans: var(--font-geist-sans), Arial, Helvetica, sans-serif;
   --font-mono: var(--font-geist-mono), monospace;
 }

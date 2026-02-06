@@ -20,7 +20,7 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 
 const menuItems = [
-    { name: "Mapa de Vagas", href: "/", icon: MapPin },
+    { name: "Mapa de Vagas", href: "/dashboard", icon: MapPin },
     { name: "Ocupar Vaga", href: "/veiculos/novo", icon: CreditCard },
     { name: "Encomendas", href: "/encomendas", icon: Package },
     { name: "Moradores", href: "/moradores", icon: Users, admin: true },
@@ -49,7 +49,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         <div className="flex h-screen bg-navy text-white overflow-hidden">
             {/* Sidebar Desktop */}
             <aside className="hidden md:flex flex-col w-64 bg-navy-light border-r border-gold/20">
-                <Link href="/" className="block p-6 border-b border-gold/20 hover:bg-navy/50 transition-colors">
+                <Link href="/dashboard" className="block p-6 border-b border-gold/20 hover:bg-navy/50 transition-colors">
                     <h1 className="text-xl font-bold text-gold">Portaria Web</h1>
                     <p className="text-xs text-gray-400">Sistema Integrado</p>
                 </Link>
@@ -76,7 +76,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                     <button
                         onClick={() => {
                             localStorage.removeItem('userRole');
-                            window.location.href = '/login';
+                            window.location.href = '/';
                         }}
                         className="flex items-center gap-3 w-full px-3 py-2 text-red-400 hover:bg-red-400/10 rounded-md"
                     >
@@ -89,7 +89,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             {/* Mobile Header */}
             <div className="flex-1 flex flex-col h-full overflow-hidden">
                 <header className="md:hidden flex items-center justify-between p-4 bg-navy-light border-b border-gold/20">
-                    <Link href="/">
+                    <Link href="/dashboard">
                         <h1 className="text-lg font-bold text-gold">Portaria Web</h1>
                     </Link>
                     <Button variant="ghost" size="icon" onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}>
@@ -126,7 +126,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                             <button
                                 onClick={() => {
                                     localStorage.removeItem('userRole');
-                                    window.location.href = '/login';
+                                    window.location.href = '/';
                                 }}
                                 className="flex items-center gap-3 w-full px-3 py-3 text-red-400 hover:bg-red-400/10 rounded-md text-lg"
                             >

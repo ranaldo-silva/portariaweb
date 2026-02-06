@@ -215,7 +215,7 @@ export const useStorage = () => {
         }
     };
 
-    const registrarEncomenda = useCallback(async (morador: any, origem: string, token: string, file: File | null) => {
+    const registrarEncomenda = useCallback(async (morador: any, origem: string, token: string, file: File | null, destinatario: string) => {
         try {
             let urlPublica = "";
             if (file) {
@@ -230,7 +230,8 @@ export const useStorage = () => {
                 token: token,
                 foto_url: urlPublica || "",
                 status: 'Pendente',
-                data_chegada: new Date().toISOString()
+                data_chegada: new Date().toISOString(),
+                destinatario: destinatario // Save recipient name
             }]);
             return !error;
         } catch (e) {
@@ -270,27 +271,48 @@ export const useStorage = () => {
             if (error || !enc) return { sucesso: false, msg: "Encomenda não encontrada!" };
 
             let autorizado = false;
+            let metodoRetirada = "Token";
             const inputClean = input.trim().replace(/\D/g, '');
 
             if (enc.token === input.trim()) {
                 autorizado = true;
+                metodoRetirada = "Token";
             }
             else if (enc.moradores && enc.moradores.cpf) {
                 const cpfMorador = enc.moradores.cpf.replace(/\D/g, '');
                 if (inputClean.length > 0 && inputClean === cpfMorador) {
                     autorizado = true;
+                    metodoRetirada = `CPF: ${inputClean.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4")}`;
                 }
             }
             else if (inputClean.length === 11) {
                 autorizado = true;
+                metodoRetirada = `CPF: ${inputClean.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4")}`;
             }
 
             if (!autorizado) return { sucesso: false, msg: "Token incorreto ou CPF inválido!" };
 
             const { error: updateError } = await supabase
-                .from('encomendas').update({ status: 'Retirado', data_retirada: new Date().toISOString() }).eq('id', tokenId);
+                .from('encomendas').update({
+                    status: 'Retirado',
+                    data_retirada: new Date().toISOString(),
+                    retirado_por: metodoRetirada
+                }).eq('id', tokenId);
             return { sucesso: !updateError, msg: updateError ? "Erro no servidor" : "Retirada confirmada!" };
         } catch { return { sucesso: false, msg: "Erro de conexão" }; }
+    }, []);
+
+
+    const atualizarEncomenda = useCallback(async (id: string, dados: any) => {
+        try {
+            const { error } = await supabase.from('encomendas').update({
+                origem: dados.origem,
+                destinatario: dados.destinatario,
+                status: dados.status,
+                retirado_por: dados.retirado_por
+            }).eq('id', id);
+            return !error;
+        } catch { return false; }
     }, []);
 
     const removerEncomenda = useCallback(async (id: string) => {
@@ -494,6 +516,7 @@ export const useStorage = () => {
         enviarAlerta, getAlertas, removerAlerta, editarAlerta,
         salvarPlantao, getPlantao, getHistoricoPlantoes,
         loginAdmin, cadastroAdmin, removerMoradorBase,
-        removerPrestador, removerVisita
+        removerPrestador, removerVisita, atualizarEncomenda
     };
 };
+
