@@ -217,7 +217,7 @@ export default function Admin() {
                                         {sol.tipo === 'dependente' && <>Nova lista: <strong>{sol.dados_novos.dependentes}</strong></>}
                                         {sol.tipo === 'contato' && <>WhatsApp: <strong>{sol.dados_novos.whatsapp}</strong></>}
                                         {sol.tipo === 'novo_cadastro' && (
-                                            <Button variant="link" className="text-blue-400 p-0 h-auto ml-2" onClick={() => {
+                                            <Button variant="ghost" className="text-blue-400 p-0 h-auto ml-2 hover:bg-transparent underline" onClick={() => {
                                                 const dados = sol.dados_novos;
                                                 setSelectedItem({
                                                     nome_responsavel: dados.nome,
