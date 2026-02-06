@@ -89,12 +89,12 @@ export const useStorage = () => {
         try {
             const { error } = await supabase.from('moradores').upsert({
                 id: morador.id || undefined,
-                nome_responsavel: formatarNomeProprio(morador.nome),
-                apartamento: parseInt(morador.ap) || 0,
+                nome_responsavel: formatarNomeProprio(morador.nome_responsavel || morador.nome),
+                apartamento: parseInt(morador.apartamento || morador.ap) || 0,
                 bloco: (morador.bloco || "").toUpperCase(),
-                carro_detalhes: formatarVeiculoBase(morador.modelo),
-                moto_detalhes: formatarVeiculoBase(morador.moto),
-                lista_moradores: formatarNomeProprio(morador.dependentes),
+                carro_detalhes: morador.carro_detalhes ? morador.carro_detalhes.toUpperCase() : formatarVeiculoBase(morador.modelo),
+                moto_detalhes: morador.moto_detalhes ? morador.moto_detalhes.toUpperCase() : formatarVeiculoBase(morador.moto),
+                lista_moradores: formatarNomeProprio(morador.lista_moradores || morador.dependentes),
                 whatsapp: (morador.whatsapp || "").replace(/\D/g, ""),
                 cpf: (morador.cpf || "").replace(/\D/g, ""),
             });

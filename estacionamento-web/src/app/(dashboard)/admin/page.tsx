@@ -158,8 +158,8 @@ export default function Admin() {
                     key={tab.id}
                     onClick={() => setActiveTab(tab.id as any)}
                     className={`flex items-center gap-2 px-4 py-2 rounded-t-lg transition-colors whitespace-nowrap ${activeTab === tab.id
-                            ? 'bg-navy text-gold border-b-2 border-gold font-bold'
-                            : 'text-gray-400 hover:text-white hover:bg-white/5'
+                        ? 'bg-navy text-gold border-b-2 border-gold font-bold'
+                        : 'text-gray-400 hover:text-white hover:bg-white/5'
                         }`}
                 >
                     {tab.icon} {tab.label}
@@ -209,8 +209,29 @@ export default function Admin() {
                     <CardContent className="space-y-4">
                         <p className="text-gray-300">Veículos Ativos: {veiculos.length} | Histórico: {historico.length}</p>
                         <Button className="w-full bg-blue-600 text-white" onClick={() => {
-                            const data = [...veiculos.map(v => ({ ...v, STATUS: 'ATIVO' })), ...historico.map(h => ({ ...h, STATUS: 'SAIU' }))];
-                            printHTML(generateReportHTML("Relatório de Veículos", data));
+                            const combined = [
+                                ...veiculos.map(v => ({
+                                    Vaga: v.vaga,
+                                    Placa: v.placa,
+                                    Modelo: v.veiculo_nome,
+                                    Apartamento: `AP ${v.apartamento} ${v.bloco}`,
+                                    Proprietario: v.proprietario,
+                                    Entrada: new Date(v.dataEntrada).toLocaleString(),
+                                    Estacionado: 'Sim'
+                                })),
+                                ...historico.map(h => ({
+                                    Vaga: h.vaga,
+                                    Placa: h.placa,
+                                    Modelo: h.veiculo,
+                                    Apartamento: `AP ${h.apartamento} ${h.bloco}`,
+                                    Proprietario: h.proprietario,
+                                    Entrada: new Date(h.dataEntrada).toLocaleString(),
+                                    Estacionado: 'Não'
+                                }))
+                            ];
+                            // Sort by Vaga (numeric)
+                            combined.sort((a, b) => Number(a.Vaga) - Number(b.Vaga));
+                            printHTML(generateReportHTML("Relatório de Veículos", combined));
                         }}>
                             Gerar Relatório
                         </Button>
@@ -226,7 +247,20 @@ export default function Admin() {
                     <CardHeader><CardTitle className="text-gold flex gap-2"><Package /> Encomendas</CardTitle></CardHeader>
                     <CardContent className="space-y-4">
                         <p className="text-gray-300">Total Registradas: {encomendas.length}</p>
-                        <Button className="w-full bg-blue-600 text-white" onClick={() => printHTML(generateReportHTML("Relatório de Encomendas", encomendas))}>
+                        <Button className="w-full bg-blue-600 text-white" onClick={() => {
+                            const data = encomendas.map(e => ({
+                                Data: new Date(e.data_chegada).toLocaleDateString(),
+                                Chegada: new Date(e.data_chegada).toLocaleTimeString(),
+                                Destinatario: e.destinatario || e.moradores?.nome_responsavel,
+                                Apartamento: `AP ${e.apartamento} ${e.bloco}`,
+                                Origem: e.origem,
+                                Status: e.status,
+                                Retirada: e.data_retirada ? new Date(e.data_retirada).toLocaleString() : '-',
+                                Retirado_Por: e.retirado_por || '-',
+                                Foto: e.foto_url // Trigger image render
+                            }));
+                            printHTML(generateReportHTML("Relatório de Encomendas", data));
+                        }}>
                             Gerar Relatório
                         </Button>
                     </CardContent>
@@ -250,7 +284,7 @@ export default function Admin() {
                 <Button onClick={loadData}>Atualizar</Button>
             </div>
 
-            <div className="bg-white rounded-lg overflow-hidden shadow">
+            <div className="bg-white rounded-lg overflow-x-auto shadow">
                 <table className="w-full text-sm text-left text-gray-800">
                     <thead className="bg-gray-100 text-gray-700">
                         <tr>
@@ -299,7 +333,7 @@ export default function Admin() {
                 <Button onClick={loadData}>Atualizar</Button>
             </div>
 
-            <div className="bg-white rounded-lg overflow-hidden shadow">
+            <div className="bg-white rounded-lg overflow-x-auto shadow">
                 <table className="w-full text-sm text-left text-gray-800">
                     <thead className="bg-gray-100 text-gray-700">
                         <tr>

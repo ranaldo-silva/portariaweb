@@ -30,7 +30,13 @@ export const generateReportHTML = (title: string, data: any[]) => {
 
     const rows = data.map(item => `
         <tr>
-            ${headers.map(h => `<td>${typeof item[h] === 'object' ? JSON.stringify(item[h]) : item[h]}</td>`).join('')}
+            ${headers.map(h => {
+        const val = item[h];
+        if (typeof val === 'string' && (val.startsWith('http') || val.startsWith('blob:')) && (val.match(/\.(jpeg|jpg|gif|png)$/) != null || h.toLowerCase().includes('foto'))) {
+            return `<td><img src="${val}" style="max-width: 100px; max-height: 100px; border-radius: 4px;"></td>`;
+        }
+        return `<td>${typeof val === 'object' ? JSON.stringify(val) : (val || '-')}</td>`
+    }).join('')}
         </tr>
     `).join('');
 

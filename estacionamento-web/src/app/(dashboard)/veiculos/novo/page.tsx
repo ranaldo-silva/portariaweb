@@ -93,7 +93,7 @@ function NovoVeiculoContent() {
         }
 
         const sucesso = await salvarVeiculo(form);
-        if (sucesso) router.push('/');
+        if (sucesso) router.push('/dashboard');
         else alert("Erro ao salvar.");
     };
 
