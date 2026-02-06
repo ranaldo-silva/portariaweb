@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { generateReportHTML, printHTML } from '@/lib/print';
+import { formatarNomeProprio, formatarVeiculoBase } from '@/lib/utils';
 import { FileText, Trash2, Car, Package, Users, Search, Edit } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { DetailsModal } from '@/components/DetailsModal';
@@ -77,6 +78,26 @@ export default function Admin() {
             }
             else if (sol.tipo === 'contato') {
                 updatePayload.whatsapp = dados.whatsapp.replace(/\D/g, "");
+            }
+            else if (sol.tipo === 'novo_cadastro') {
+                // Insert new resident
+                const { error: insertError } = await supabase.from('moradores').insert([{
+                    nome_responsavel: formatarNomeProprio(dados.nome),
+                    apartamento: parseInt(dados.apartamento),
+                    bloco: dados.bloco.toUpperCase(),
+                    whatsapp: dados.whatsapp.replace(/\D/g, ""),
+                    carro_detalhes: formatarVeiculoBase(dados.carro),
+                    moto_detalhes: formatarVeiculoBase(dados.moto),
+                    lista_moradores: formatarNomeProprio(dados.dependentes)
+                }]);
+                if (insertError) throw insertError;
+
+                // We don't need to update an existing morador, so we skip the update call below
+                await supabase.from('solicitacoes').update({ status: 'aprovado' }).eq('id', sol.id);
+                alert("Cadastro aprovado e morador criado!");
+                loadSolicitacoes();
+                loadData();
+                return;
             }
 
             const { error: updateError } = await supabase.from('moradores').update(updatePayload).eq('id', sol.morador_id);
@@ -179,13 +200,39 @@ export default function Admin() {
                             <div key={sol.id} className="bg-navy p-4 rounded border border-gray-700 flex flex-col md:flex-row gap-4 items-start md:items-center">
                                 <div className="flex-1">
                                     <h4 className="font-bold text-gold text-lg">
-                                        {sol.moradores?.nome_responsavel} <span className="text-sm text-gray-400">(Ap {sol.moradores?.apartamento})</span>
+                                        {sol.tipo === 'novo_cadastro'
+                                            ? sol.dados_novos.nome
+                                            : sol.moradores?.nome_responsavel}
+
+                                        <span className="text-sm text-gray-400 ml-2">
+                                            {sol.tipo === 'novo_cadastro'
+                                                ? `(Ap ${sol.dados_novos.apartamento} ${sol.dados_novos.bloco})`
+                                                : `(Ap ${sol.moradores?.apartamento} ${sol.moradores?.bloco})`
+                                            }
+                                        </span>
                                     </h4>
-                                    <p className="text-xs text-white uppercase font-bold bg-blue-900 inline-block px-2 py-0.5 rounded mb-2">{sol.tipo}</p>
+                                    <p className="text-xs text-white uppercase font-bold bg-blue-900 inline-block px-2 py-0.5 rounded mb-2">{sol.tipo.replace('_', ' ')}</p>
                                     <div className="text-gray-300 text-sm">
                                         {sol.tipo === 'veiculo' && <>Solicita: <strong>{sol.dados_novos.modelo} - {sol.dados_novos.placa}</strong></>}
                                         {sol.tipo === 'dependente' && <>Nova lista: <strong>{sol.dados_novos.dependentes}</strong></>}
                                         {sol.tipo === 'contato' && <>WhatsApp: <strong>{sol.dados_novos.whatsapp}</strong></>}
+                                        {sol.tipo === 'novo_cadastro' && (
+                                            <Button variant="link" className="text-blue-400 p-0 h-auto ml-2" onClick={() => {
+                                                const dados = sol.dados_novos;
+                                                setSelectedItem({
+                                                    nome_responsavel: dados.nome,
+                                                    apartamento: dados.apartamento,
+                                                    bloco: dados.bloco,
+                                                    whatsapp: dados.whatsapp,
+                                                    carro_detalhes: `${dados.carro}`,
+                                                    moto_detalhes: `${dados.moto}`,
+                                                    lista_moradores: dados.dependentes
+                                                });
+                                                setModalType('morador'); // Reuses resident modal in read-only mode (since no ID)
+                                            }}>
+                                                Ver Detalhes do Cadastro
+                                            </Button>
+                                        )}
                                     </div>
                                 </div>
                                 <div className="flex gap-2 w-full md:w-auto">
