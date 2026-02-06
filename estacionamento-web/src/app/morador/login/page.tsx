@@ -152,7 +152,7 @@ export default function LoginMorador() {
                             </div>
                             <div className="space-y-2">
                                 <label className="text-sm font-bold text-gray-700 dark:text-gray-300">Bloco *</label>
-                                <Input value={cadastroData.bloco} onChange={e => setCadastroData({ ...cadastroData, bloco: e.target.value })} className="bg-white text-black text-uppercase" placeholder="A" />
+                                <Input value={cadastroData.bloco} onChange={e => setCadastroData({ ...cadastroData, bloco: e.target.value })} className="bg-white text-black uppercase placeholder:text-gray-400" placeholder="A" />
                             </div>
                         </div>
                         <div className="space-y-2">

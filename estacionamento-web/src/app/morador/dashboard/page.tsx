@@ -224,7 +224,7 @@ export default function DashboardMorador() {
                                 Atualizar
                             </Button>
                         </div>
-                        <div className="text-sm">
+                        <div className="text-sm font-medium text-foreground">
                             {morador?.whatsapp || "Não informado"}
                         </div>
                     </CardContent>
