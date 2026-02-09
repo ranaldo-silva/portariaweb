@@ -58,8 +58,8 @@ export default function LoginPage() {
         <div className="min-h-screen bg-navy flex items-center justify-center p-4">
             <div className="w-full max-w-md space-y-8 animate-in fade-in zoom-in duration-500">
                 <div className="text-center">
-                    <h1 className="text-4xl font-bold text-gold mb-2">Portaria Web</h1>
-                    <p className="text-gray-400">Sistema Integrado de Portaria</p>
+                    <h1 className="text-4xl font-bold text-gold mb-2">Smart Portaria</h1>
+                    <p className="text-gray-400">Gestão Inteligente de Condomínios</p>
                 </div>
 
                 <Card className="bg-navy-light border-gold shadow-2xl">

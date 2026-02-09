@@ -14,7 +14,14 @@ export default function LoginMorador() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
 
-    const handleLogin = async () => {
+    // Auth Flow State
+    const [step, setStep] = useState<'PHONE' | 'FIRST_ACCESS' | 'PASSWORD'>('PHONE');
+    const [tempMorador, setTempMorador] = useState<any>(null);
+    const [cpf, setCpf] = useState("");
+    const [senha, setSenha] = useState("");
+    const [confirmSenha, setConfirmSenha] = useState("");
+
+    const handleCheckPhone = async () => {
         if (!whatsapp || whatsapp.length < 8) {
             setError("Digite um número válido.");
             return;
@@ -24,39 +31,27 @@ export default function LoginMorador() {
         setError("");
 
         try {
-            // Clean input: remove non-numeric chars
             const cleanPhone = whatsapp.replace(/\D/g, "");
 
-            // Simple fuzzy match strategy: 
-            // We search for residents where the stored whatsapp *contains* this number 
-            // OR the stored number (cleaned) equals this number.
-
-            // Fetch all (optimization: could filter in DB but whatsapp formats vary)
             const { data: moradores, error: dbError } = await supabase
                 .from('moradores')
                 .select('*');
 
             if (dbError) throw dbError;
 
-            // Find match
             const morador = moradores?.find(m => {
                 const stored = (m.whatsapp || "").replace(/\D/g, "");
-                // Must have a stored number to match
                 if (!stored || stored.length < 8) return false;
-
-                // Strict equality or suffix match (to handle 55 prefix differences)
-                // Logic: Input must equal Stored OR Input/Stored must end with same 8+ digits
-                // But safest is:
                 return stored === cleanPhone || (stored.endsWith(cleanPhone) && cleanPhone.length >= 8) || (cleanPhone.endsWith(stored) && stored.length >= 8);
             });
 
             if (morador) {
-                // Save session (simple localStorage for this POC)
-                localStorage.setItem("morador_session_id", morador.id);
-                localStorage.setItem("morador_session_name", morador.nome_responsavel);
-                localStorage.setItem("morador_session_dados", JSON.stringify(morador));
-
-                router.push("/morador/dashboard");
+                setTempMorador(morador);
+                if (!morador.senha) {
+                    setStep('FIRST_ACCESS');
+                } else {
+                    setStep('PASSWORD');
+                }
             } else {
                 setError("Número não encontrado. Contate a portaria.");
             }
@@ -66,6 +61,59 @@ export default function LoginMorador() {
         } finally {
             setLoading(false);
         }
+    };
+
+
+    const handleFirstAccess = async () => {
+        const cleanCpf = cpf.replace(/\D/g, "");
+        if (!cleanCpf || cleanCpf.length < 11) {
+            setError("CPF inválido.");
+            return;
+        }
+
+        setLoading(true);
+        try {
+            // Auto-generate password from first 5 digits of CPF
+            const generatedPassword = cleanCpf.substring(0, 5);
+
+            const { error } = await supabase
+                .from('moradores')
+                .update({
+                    cpf: cleanCpf,
+                    senha: generatedPassword
+                })
+                .eq('id', tempMorador.id);
+
+            if (error) throw error;
+
+            loginSuccess({ ...tempMorador, cpf: cleanCpf, senha: generatedPassword });
+        } catch (err) {
+            console.error(err);
+            setError("Erro ao salvar cadastro. Tente novamente.");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handlePasswordLogin = async () => {
+        if (!senha) {
+            setError("Digite sua senha.");
+            return;
+        }
+
+        if (senha !== tempMorador.senha) {
+            setError("Senha incorreta.");
+            return;
+        }
+
+        loginSuccess(tempMorador);
+    };
+
+    const loginSuccess = (moradorData: any) => {
+        localStorage.setItem("morador_session_id", moradorData.id);
+        localStorage.setItem("morador_session_name", moradorData.nome_responsavel);
+        localStorage.setItem("morador_session_dados", JSON.stringify(moradorData));
+        router.push("/morador/dashboard");
     };
 
     const [showCadastro, setShowCadastro] = useState(false);
@@ -205,54 +253,124 @@ export default function LoginMorador() {
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
-                    <div className="space-y-2">
-                        <label className="text-sm font-bold text-gray-700 dark:text-gray-300">Seu WhatsApp</label>
-                        <div className="relative">
-                            <Phone className="absolute left-3 top-3 h-5 w-5 text-blue-500 dark:text-gold" />
-                            <Input
-                                placeholder="(11) 99999-9999"
-                                className="pl-10 h-11 border-blue-200 dark:border-gray-600 focus:border-blue-500 focus:ring-blue-500 bg-blue-50 dark:bg-navy dark:text-white text-lg placeholder:text-gray-400"
-                                value={whatsapp}
-                                onChange={(e) => setWhatsapp(e.target.value)}
-                                type="tel"
-                            />
-                        </div>
-                    </div>
 
-                    {error && (
-                        <div className="bg-red-50 text-red-600 text-sm p-3 rounded-md flex items-center justify-center gap-2 font-medium border border-red-100">
-                            <AlertTriangle size={16} /> {error}
+                    {step === 'PHONE' && (
+                        <div className="space-y-4">
+                            <div className="space-y-2">
+                                <label className="text-sm font-bold text-gray-700 dark:text-gray-300">Seu WhatsApp</label>
+                                <div className="relative">
+                                    <Phone className="absolute left-3 top-3 h-5 w-5 text-blue-500 dark:text-gold" />
+                                    <Input
+                                        placeholder="(11) 99999-9999"
+                                        className="pl-10 h-11 border-blue-200 dark:border-gray-600 focus:border-blue-500 focus:ring-blue-500 bg-blue-50 dark:bg-navy dark:text-white text-lg placeholder:text-gray-400"
+                                        value={whatsapp}
+                                        onChange={(e) => setWhatsapp(e.target.value)}
+                                        type="tel"
+                                    />
+                                </div>
+                            </div>
+                            <Button
+                                className="w-full h-11 bg-blue-600 hover:bg-blue-700 dark:bg-gold dark:text-navy dark:hover:bg-gold-hover text-white font-bold text-md shadow-lg shadow-blue-500/30 dark:shadow-none transition-all"
+                                onClick={handleCheckPhone}
+                                disabled={loading}
+                            >
+                                {loading ? "Verificando..." : "Continuar"}
+                                {!loading && <LogIn className="ml-2 h-5 w-5" />}
+                            </Button>
+                            <div className="relative flex items-center py-2">
+                                <div className="flex-grow border-t border-gray-300 dark:border-gray-600"></div>
+                                <span className="flex-shrink-0 mx-4 text-gray-400 text-xs uppercase">Sem cadastro?</span>
+                                <div className="flex-grow border-t border-gray-300 dark:border-gray-600"></div>
+                            </div>
+
+                            <Button
+                                variant="outline"
+                                className="w-full h-11 border-blue-300 text-blue-700 hover:bg-blue-50 dark:border-gold dark:text-gold dark:hover:bg-navy"
+                                onClick={() => setShowCadastro(true)}
+                            >
+                                Criar Cadastro
+                            </Button>
                         </div>
                     )}
 
-                    <div className="space-y-4">
-                        <Button
-                            className="w-full h-11 bg-blue-600 hover:bg-blue-700 dark:bg-gold dark:text-navy dark:hover:bg-gold-hover text-white font-bold text-md shadow-lg shadow-blue-500/30 dark:shadow-none transition-all"
-                            onClick={handleLogin}
-                            disabled={loading}
-                        >
-                            {loading ? "Verificando..." : "Entrar no Sistema"}
-                            {!loading && <LogIn className="ml-2 h-5 w-5" />}
-                        </Button>
+                    {step === 'FIRST_ACCESS' && (
+                        <div className="space-y-4 animate-in fade-in slide-in-from-right-4">
+                            <div className="bg-yellow-50 dark:bg-yellow-900/20 p-3 rounded border border-yellow-100 dark:border-yellow-800 text-center">
+                                <p className="text-sm text-yellow-800 dark:text-yellow-400 font-bold">Primeiro Acesso Identificado!</p>
+                                <p className="text-xs text-yellow-700 dark:text-yellow-500">
+                                    Confirme seu CPF para liberar o acesso.<br />
+                                    <span className="opacity-75">Sua senha será os 5 primeiros dígitos do CPF.</span>
+                                </p>
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-sm font-bold text-gray-700 dark:text-gray-300">Informe seu CPF</label>
+                                <Input
+                                    placeholder="000.000.000-00"
+                                    className="h-11 border-blue-200 dark:border-gray-600 bg-white dark:bg-navy text-black dark:text-white"
+                                    value={cpf}
+                                    onChange={(e) => setCpf(e.target.value)}
+                                />
+                            </div>
 
-                        <div className="relative flex items-center py-2">
-                            <div className="flex-grow border-t border-gray-300 dark:border-gray-600"></div>
-                            <span className="flex-shrink-0 mx-4 text-gray-400 text-xs uppercase">Primeiro Acesso?</span>
-                            <div className="flex-grow border-t border-gray-300 dark:border-gray-600"></div>
+                            <Button
+                                className="w-full h-11 bg-green-600 hover:bg-green-700 text-white font-bold"
+                                onClick={handleFirstAccess}
+                                disabled={loading}
+                            >
+                                {loading ? "Validando e Acessando..." : "Acessar Sistema"}
+                            </Button>
+                            <Button variant="ghost" className="w-full text-xs text-gray-500" onClick={() => setStep('PHONE')}>Voltar</Button>
                         </div>
+                    )}
 
-                        <Button
-                            variant="outline"
-                            className="w-full h-11 border-blue-300 text-blue-700 hover:bg-blue-50 dark:border-gold dark:text-gold dark:hover:bg-navy"
-                            onClick={() => setShowCadastro(true)}
-                        >
-                            Criar Cadastro
-                        </Button>
-                    </div>
 
-                    <p className="text-xs text-center text-gray-400 mt-6 leading-relaxed">
-                        Sistema exclusivo para moradores.<br />
-                        Em caso de dúvidas, procure a portaria.
+                    {step === 'PASSWORD' && (
+                        <div className="space-y-4 animate-in fade-in slide-in-from-right-4">
+                            <div className="text-center mb-4">
+                                <p className="text-sm font-bold text-blue-900 dark:text-white">Olá, {tempMorador?.nome_responsavel?.split(' ')[0]}</p>
+                                <p className="text-xs text-gray-500">
+                                    Digite sua senha para entrar.<br />
+                                    <span className="text-blue-600 dark:text-blue-400 font-medium opacity-90 block mt-1">
+                                        (Sua senha são os 5 primeiros dígitos do CPF)
+                                    </span>
+                                </p>
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-sm font-bold text-gray-700 dark:text-gray-300">Senha</label>
+                                <Input
+                                    placeholder="******"
+                                    type="password"
+                                    className="h-11 border-blue-200 dark:border-gray-600 bg-white dark:bg-navy text-black dark:text-white"
+                                    value={senha}
+                                    onChange={(e) => setSenha(e.target.value)}
+                                />
+                            </div>
+                            <Button
+                                className="w-full h-11 bg-blue-600 hover:bg-blue-700 text-white font-bold"
+                                onClick={handlePasswordLogin}
+                                disabled={loading}
+                            >
+                                {loading ? "Entrando..." : "Acessar"}
+                            </Button>
+                            <Button variant="ghost" className="w-full text-xs text-gray-500" onClick={() => {
+                                setStep('PHONE');
+                                setSenha('');
+                                setTempMorador(null);
+                            }}>Voltar / Trocar Usuário</Button>
+                        </div>
+                    )}
+
+
+                    <p className="text-xs text-center text-gray-400 mt-6 leading-relaxed flex flex-col items-center gap-1">
+                        <span>Sistema exclusivo para moradores.</span>
+                        <span className="flex items-center gap-1">
+                            Em caso de dúvidas, contatar o corpo diretivo pelo WhatsApp
+                            <a href="https://wa.me/5511912058006" target="_blank" className="ml-1 inline-flex items-center justify-center text-green-500 hover:scale-110 transition-transform">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 16 16">
+                                    <path d="M13.601 2.326A7.854 7.854 0 0 0 7.994 0C3.627 0 .068 3.558.064 7.926c0 1.399.366 2.76 1.057 3.965L0 16l4.204-1.102a7.9 7.9 0 0 0 3.79.965h.004c4.368 0 7.926-3.558 7.93-7.93A7.898 7.898 0 0 0 13.6 2.326zM7.994 14.521a6.573 6.573 0 0 1-3.356-.92l-.24-.144-2.494.654.666-2.433-.156-.251a6.56 6.56 0 0 1-1.007-3.505c0-3.626 2.957-6.584 6.591-6.584a6.56 6.56 0 0 1 4.66 1.931 6.557 6.557 0 0 1 1.928 4.66c-.004 3.639-2.961 6.592-6.592 6.592zm3.615-4.934c-.197-.099-1.17-.578-1.353-.646-.182-.065-.315-.099-.445.099-.133.197-.513.646-.627.775-.114.133-.232.148-.43.05-.197-.1-.836-.308-1.592-.985-.59-.525-.985-1.175-1.103-1.372-.114-.198-.011-.304.088-.403.087-.088.197-.232.296-.346.1-.114.133-.198.198-.33.065-.134.034-.248-.015-.347-.05-.099-.445-1.076-.612-1.47-.16-.389-.323-.335-.445-.34-.114-.007-.247-.007-.38-.007a.729.729 0 0 0-.529.247c-.182.198-.691.677-.691 1.654 0 .977.71 1.916.81 2.049.098.133 1.394 2.132 3.383 2.992.47.205.84.326 1.129.418.475.152.904.129 1.246.08.38-.058 1.171-.48 1.338-.943.164-.464.164-.86.114-.943-.049-.084-.182-.133-.38-.232z" />
+                                </svg>
+                            </a>
+                        </span>
                     </p>
                 </CardContent>
             </Card>

@@ -50,7 +50,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             {/* Sidebar Desktop */}
             <aside className="hidden md:flex flex-col w-64 bg-navy-light border-r border-gold/20">
                 <Link href="/dashboard" className="block p-6 border-b border-gold/20 hover:bg-navy/50 transition-colors">
-                    <h1 className="text-xl font-bold text-gold">Portaria Web</h1>
+                    <h1 className="text-xl font-bold text-gold">Smart Portaria</h1>
                     <p className="text-xs text-gray-400">Sistema Integrado</p>
                 </Link>
 
@@ -90,7 +90,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             <div className="flex-1 flex flex-col h-full overflow-hidden">
                 <header className="md:hidden flex items-center justify-between p-4 bg-navy-light border-b border-gold/20">
                     <Link href="/dashboard">
-                        <h1 className="text-lg font-bold text-gold">Portaria Web</h1>
+                        <h1 className="text-lg font-bold text-gold">Smart Portaria</h1>
                     </Link>
                     <Button variant="ghost" size="icon" onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}>
                         <Menu size={24} className="text-gold" />
