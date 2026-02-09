@@ -13,10 +13,11 @@ interface DetailsModalProps {
     data: any;
     type?: 'morador' | 'encomenda' | 'visita' | 'prestador' | 'veiculo';
     onSave?: (updatedData: any) => Promise<void>;
+    readOnly?: boolean;
     onDelete?: (id: string) => Promise<void>;
 }
 
-export function DetailsModal({ isOpen, onClose, title, data, type = 'morador', onSave, onDelete }: DetailsModalProps) {
+export function DetailsModal({ isOpen, onClose, title, data, type = 'morador', onSave, onDelete, readOnly = false }: DetailsModalProps) {
     const [isEditing, setIsEditing] = useState(false);
     const [formData, setFormData] = useState<any>({});
     const [loading, setLoading] = useState(false);
@@ -76,6 +77,12 @@ export function DetailsModal({ isOpen, onClose, title, data, type = 'morador', o
                             {(data.apartamento || data.bloco) && (
                                 <p><strong className="text-gold">Unidade:</strong> AP {data.apartamento} - {data.bloco}</p>
                             )}
+
+                            {/* Generic Vehicle Details */}
+                            {data.modelo && <p><strong className="text-gold">Modelo:</strong> {data.modelo}</p>}
+                            {data.placa && <p><strong className="text-gold">Placa:</strong> {data.placa}</p>}
+                            {data.cor && <p><strong className="text-gold">Cor:</strong> {data.cor}</p>}
+                            {data.tipo_veiculo && <p><strong className="text-gold">Tipo:</strong> {data.tipo_veiculo}</p>}
 
                             {/* Resident Specific */}
                             {type === 'morador' && (
@@ -194,15 +201,15 @@ export function DetailsModal({ isOpen, onClose, title, data, type = 'morador', o
                 </CardContent>
 
                 <CardFooter className="bg-navy-dark border-t border-gray-700 p-4 flex justify-between">
-                    {/* Delete Action (Always Visible if enabled) */}
-                    {onDelete ? (
+                    {/* Delete Action (Always Visible if enabled and not readOnly) */}
+                    {onDelete && !readOnly ? (
                         <Button variant="destructive" size="sm" onClick={handleDelete} disabled={loading}>
                             <Trash2 size={16} className="mr-2" /> Excluir
                         </Button>
                     ) : <div></div>}
 
                     {/* Edit/Save Actions */}
-                    {onSave && (
+                    {onSave && !readOnly && (
                         <div className="flex gap-2">
                             {isEditing ? (
                                 <>

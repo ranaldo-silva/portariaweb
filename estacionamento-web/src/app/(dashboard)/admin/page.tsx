@@ -70,8 +70,12 @@ export default function Admin() {
 
             if (sol.tipo === 'veiculo') {
                 const infoVeiculo = `${dados.modelo}, ${dados.placa}, ${dados.cor}`.toUpperCase();
-                if (dados.tipo_veiculo === 'Moto') updatePayload.moto_detalhes = infoVeiculo;
-                else updatePayload.carro_detalhes = infoVeiculo;
+                // Check local state or payload for vehicle type
+                if (dados.tipo_veiculo === 'Moto') {
+                    updatePayload.moto_detalhes = infoVeiculo;
+                } else {
+                    updatePayload.carro_detalhes = infoVeiculo;
+                }
             }
             else if (sol.tipo === 'dependente') {
                 updatePayload.lista_moradores = dados.dependentes.toUpperCase();
@@ -236,6 +240,30 @@ export default function Admin() {
                                     </div>
                                 </div>
                                 <div className="flex gap-2 w-full md:w-auto">
+                                    <Button variant="ghost" className="text-blue-400 p-0 h-auto hover:bg-transparent underline mr-2" onClick={() => {
+                                        const dados = sol.dados_novos;
+                                        let details: any = { ...dados };
+
+                                        // Normalize data for Modal
+                                        if (sol.tipo === 'veiculo') {
+                                            details = {
+                                                ...details,
+                                                tipo_veiculo: dados.tipo_veiculo || 'Carro',
+                                                modelo: dados.modelo,
+                                                placa: dados.placa,
+                                                cor: dados.cor
+                                            };
+                                        } else if (sol.tipo === 'dependente') {
+                                            details = { lista_moradores: dados.dependentes };
+                                        } else if (sol.tipo === 'contato') {
+                                            details = { whatsapp: dados.whatsapp };
+                                        }
+
+                                        setSelectedItem(details);
+                                        setModalType(sol.tipo === 'novo_cadastro' ? 'morador' : 'detalhes_solicitacao');
+                                    }}>
+                                        Ver Detalhes
+                                    </Button>
                                     <Button className="bg-green-600 hover:bg-green-700 flex-1" onClick={() => handleAprovar(sol)}>Aprovar</Button>
                                     <Button variant="destructive" className="flex-1" onClick={() => handleRejeitar(sol.id)}>Rejeitar</Button>
                                 </div>
@@ -436,11 +464,13 @@ export default function Admin() {
                 <DetailsModal
                     isOpen={!!selectedItem}
                     onClose={() => setSelectedItem(null)}
-                    title={modalType === 'morador' ? "Detalhes do Morador" : "Detalhes da Encomenda"}
+                    title={modalType === 'morador' ? "Detalhes do Morador" :
+                        modalType === 'detalhes_solicitacao' ? "Detalhes da Solicitação" : "Detalhes da Encomenda"}
                     data={selectedItem}
-                    type={modalType}
-                    onSave={modalType === 'morador' ? handleSaveMorador : handleSaveEncomenda}
-                    onDelete={modalType === 'morador' ? handleDeleteMorador : handleDeleteEncomenda}
+                    type={modalType === 'detalhes_solicitacao' ? 'morador' : modalType} // Reuse morador display for generic details
+                    readOnly={modalType === 'detalhes_solicitacao'}
+                    onSave={modalType === 'morador' ? handleSaveMorador : (modalType === 'encomenda' ? handleSaveEncomenda : undefined)}
+                    onDelete={modalType === 'morador' ? handleDeleteMorador : (modalType === 'encomenda' ? handleDeleteEncomenda : undefined)}
                 />
             )}
         </div>
