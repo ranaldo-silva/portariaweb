@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { generateReportHTML, printHTML } from '@/lib/print';
 import { formatarNomeProprio, formatarVeiculoBase } from '@/lib/utils';
-import { FileText, Trash2, Car, Package, Users, Search, Edit } from 'lucide-react';
+import { FileText, Trash2, Car, Package, Users, Search, Edit, UserCog } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { DetailsModal } from '@/components/DetailsModal';
 
@@ -15,16 +15,17 @@ export default function Admin() {
     const {
         getVeiculos, getHistorico, getTodasEncomendas, limparHistorico, limparAtivos,
         getMoradoresBase, salvarMoradorBase, removerMoradorBase,
-        atualizarEncomenda, removerEncomenda
+        atualizarEncomenda, removerEncomenda, getVisitas
     } = useStorage();
 
-    const [activeTab, setActiveTab] = useState<'dashboard' | 'moradores' | 'encomendas'>('dashboard');
+    const [activeTab, setActiveTab] = useState<'dashboard' | 'moradores' | 'encomendas' | 'visitas'>('dashboard');
 
     // Data States
     const [veiculos, setVeiculos] = useState<any[]>([]);
     const [historico, setHistorico] = useState<any[]>([]);
     const [encomendas, setEncomendas] = useState<any[]>([]);
     const [moradores, setMoradores] = useState<any[]>([]);
+    const [visitasList, setVisitasList] = useState<any[]>([]);
     const [solicitacoes, setSolicitacoes] = useState<any[]>([]);
 
     // UI States
@@ -38,16 +39,18 @@ export default function Admin() {
     }, []);
 
     const loadData = async () => {
-        const [v, h, e, m] = await Promise.all([
+        const [v, h, e, m, vis] = await Promise.all([
             getVeiculos(),
             getHistorico(),
             getTodasEncomendas(),
-            getMoradoresBase()
+            getMoradoresBase(),
+            getVisitas()
         ]);
         setVeiculos(v || []);
         setHistorico(h || []);
         setEncomendas(e || []);
         setMoradores(m || []);
+        setVisitasList(vis || []);
         loadSolicitacoes();
     };
 
@@ -178,6 +181,7 @@ export default function Admin() {
                 { id: 'dashboard', label: 'Dashboard & Aprovações', icon: <FileText size={18} /> },
                 { id: 'moradores', label: 'Gerenciar Moradores', icon: <Users size={18} /> },
                 { id: 'encomendas', label: 'Gerenciar Encomendas', icon: <Package size={18} /> },
+                { id: 'visitas', label: 'Histórico de Visitas', icon: <UserCog size={18} /> },
             ].map(tab => (
                 <button
                     key={tab.id}
@@ -450,6 +454,66 @@ export default function Admin() {
         </div>
     );
 
+    const renderVisitas = () => (
+        <div className="space-y-4 animate-in fade-in">
+            <div className="flex justify-between items-center bg-white p-4 rounded-lg shadow">
+                <div className="flex items-center gap-4">
+                    <UserCog className="text-gold h-8 w-8" />
+                    <div>
+                        <h2 className="text-xl font-bold text-navy">Relatório de Visitas</h2>
+                        <p className="text-sm text-gray-500">Total de registros: {visitasList.length}</p>
+                    </div>
+                </div>
+                <Button className="bg-blue-600 text-white" onClick={() => {
+                    const data = visitasList.map(v => ({
+                        Data: new Date(v.data_visita).toLocaleString(),
+                        Visitante: v.visitante_nome,
+                        Documento: v.documento || '-',
+                        Destino: `AP ${v.apartamento} ${v.bloco}`,
+                        Observacao: v.observacoes || '-',
+                        Foto: v.foto_url
+                    }));
+                    printHTML(generateReportHTML("Histórico de Visitas", data));
+                }}>
+                    Imprimir Relatório
+                </Button>
+            </div>
+
+            <div className="bg-white rounded-lg overflow-x-auto shadow">
+                <table className="w-full text-sm text-left text-gray-800">
+                    <thead className="bg-gray-100 text-gray-700">
+                        <tr>
+                            <th className="p-3">Data/Hora</th>
+                            <th className="p-3">Visitante</th>
+                            <th className="p-3">Documento</th>
+                            <th className="p-3">Destino</th>
+                            <th className="p-3">Observações</th>
+                            <th className="p-3 text-right">Foto</th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200">
+                        {visitasList.map(v => (
+                            <tr key={v.id} className="hover:bg-gray-50">
+                                <td className="p-3 text-xs text-gray-500">{new Date(v.data_visita).toLocaleString()}</td>
+                                <td className="p-3 font-bold">{v.visitante_nome}</td>
+                                <td className="p-3">{v.documento}</td>
+                                <td className="p-3">AP {v.apartamento} {v.bloco}</td>
+                                <td className="p-3 text-xs italic text-gray-600">{v.observacoes || "-"}</td>
+                                <td className="p-3 text-right">
+                                    {v.foto_url ? (
+                                        <img src={v.foto_url} className="w-8 h-8 rounded-full object-cover ml-auto border border-gray-300" />
+                                    ) : (
+                                        <div className="w-8 h-8 rounded-full bg-gray-200 ml-auto flex items-center justify-center text-xs">?</div>
+                                    )}
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    );
+
     return (
         <div className="space-y-6">
             <h1 className="text-2xl font-bold text-gold">Painel Administrativo</h1>
@@ -459,6 +523,7 @@ export default function Admin() {
             {activeTab === 'dashboard' && renderDashboard()}
             {activeTab === 'moradores' && renderMoradores()}
             {activeTab === 'encomendas' && renderEncomendas()}
+            {activeTab === 'visitas' && renderVisitas()}
 
             {selectedItem && (
                 <DetailsModal

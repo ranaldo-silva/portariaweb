@@ -322,12 +322,15 @@ export default function LoginMorador() {
                                     placeholder="000.000.000-00"
                                     className="h-11 border-blue-200 dark:border-gray-600 bg-white dark:bg-navy text-black dark:text-white"
                                     value={cpf}
-                                    onChange={(e) => setCpf(e.target.value)}
+                                    onChange={(e) => {
+                                        setCpf(e.target.value);
+                                        if (error) setError("");
+                                    }}
                                 />
                             </div>
 
                             {error && (
-                                <div className="bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 text-sm p-3 rounded-md flex items-center gap-2 font-medium border border-red-100 dark:border-red-900 animate-in fade-in slide-in-from-top-1">
+                                <div className="bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 text-sm p-3 rounded-md flex items-center gap-2 font-medium border border-red-100 dark:border-red-900">
                                     <AlertTriangle size={18} className="shrink-0" />
                                     <span>{error}</span>
                                 </div>
