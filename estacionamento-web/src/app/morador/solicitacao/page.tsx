@@ -40,6 +40,20 @@ function SolicitacaoForm() {
         setLoading(true);
 
         try {
+            if (tipo === 'visita') {
+                const { error } = await supabase.from('pre_autorizacoes').insert([{
+                    morador_id: moradorId,
+                    visitante_nome: formData.nome,
+                    documento: formData.documento,
+                    observacoes: formData.observacoes,
+                    status: 'pendente'
+                }]);
+                if (error) throw error;
+                alert("Visitante autorizado com sucesso!");
+                router.push("/morador/visitas");
+                return;
+            }
+
             // Prepare data based on type
             const payload = {
                 morador_id: moradorId,
@@ -117,6 +131,36 @@ function SolicitacaoForm() {
                         </div>
                     </div>
                 );
+            case 'visita':
+                return (
+                    <div className="space-y-4">
+                        <div className="bg-blue-50 p-3 rounded text-sm text-blue-800 mb-4">
+                            Autorize a entrada de um visitante. Ele aparecerá na lista da portaria.
+                        </div>
+                        <div>
+                            <label className="text-sm font-medium">Nome do Visitante</label>
+                            <Input
+                                placeholder="Nome Completo"
+                                onChange={e => handleChange('nome', e.target.value)}
+                            />
+                        </div>
+                        <div>
+                            <label className="text-sm font-medium">Documento (RG/CPF)</label>
+                            <Input
+                                placeholder="Apenas números (opcional)"
+                                onChange={e => handleChange('documento', e.target.value)}
+                            />
+                        </div>
+                        <div>
+                            <label className="text-sm font-medium">Observações</label>
+                            <Textarea
+                                placeholder="Ex: Entregar chaves, Prestador de serviço..."
+                                onChange={e => handleChange('observacoes', e.target.value)}
+                                rows={3}
+                            />
+                        </div>
+                    </div>
+                );
             case 'contato':
                 return (
                     <div className="space-y-4">
@@ -139,6 +183,7 @@ function SolicitacaoForm() {
         if (tipo === 'veiculo') return "Novo Veículo";
         if (tipo === 'dependente') return "Atualizar Dependentes";
         if (tipo === 'contato') return "Atualizar Contato";
+        if (tipo === 'visita') return "Autorizar Visitante";
         return "Solicitação";
     };
 

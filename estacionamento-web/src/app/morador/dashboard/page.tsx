@@ -96,42 +96,35 @@ export default function DashboardMorador() {
                 </div>
             </div>
 
-            {/* Packages */}
-            <div onClick={() => router.push('/morador/encomendas')} className="cursor-pointer transition-transform hover:scale-[1.01]">
-                <Card className="border-gold/30 shadow-md bg-card text-card-foreground">
-                    <CardHeader className="pb-3">
-                        <CardTitle className="flex items-center justify-between text-gold">
-                            <span className="flex items-center gap-2"><Package size={20} /> Minhas Encomendas</span>
-                            <span className="text-xs bg-gold/20 text-gold px-2 py-1 rounded-full">Ver Histórico</span>
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        {encomendas.length === 0 ? (
-                            <p className="text-gray-400 text-sm text-center py-4">Nenhuma encomenda pendente.</p>
-                        ) : (
-                            <div className="space-y-3">
-                                {encomendas.map(enc => (
-                                    <div key={enc.id} className="flex gap-3 items-center bg-muted/50 p-3 rounded border border-border">
-                                        {enc.foto_url && (
-                                            <div
-                                                className="h-12 w-12 bg-cover bg-center rounded-md shrink-0"
-                                                style={{ backgroundImage: `url(${enc.foto_url})` }}
-                                            />
-                                        )}
-                                        <div className="flex-1 min-w-0">
-                                            <h4 className="font-bold text-primary truncate text-sm">{enc.origem}</h4>
-                                            {enc.destinatario && <p className="text-xs text-blue-600 dark:text-blue-400 font-bold">Para: {enc.destinatario}</p>}
-                                            <p className="text-xs text-muted-foreground mt-1">Cód: {enc.token}</p>
-                                        </div>
-                                        <div className="px-2 py-1 bg-yellow-100 text-yellow-700 text-xs font-bold rounded">
-                                            {enc.token}
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                    </CardContent>
-                </Card>
+            {/* Quick Actions */}
+            <div className="grid grid-cols-2 gap-4">
+                <div onClick={() => router.push('/morador/encomendas')} className="cursor-pointer transition-transform hover:scale-[1.01]">
+                    <Card className="border-gold/30 shadow-md bg-card text-card-foreground h-full">
+                        <CardHeader className="p-4 pb-2">
+                            <CardTitle className="flex items-center gap-2 text-gold text-sm">
+                                <Package size={18} /> Encomendas
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="p-4 pt-0">
+                            <p className="text-2xl font-bold">{encomendas.length}</p>
+                            <p className="text-xs text-muted-foreground">Pendentes</p>
+                        </CardContent>
+                    </Card>
+                </div>
+
+                <div onClick={() => router.push('/morador/visitas')} className="cursor-pointer transition-transform hover:scale-[1.01]">
+                    <Card className="border-green-500/30 shadow-md bg-card text-card-foreground h-full">
+                        <CardHeader className="p-4 pb-2">
+                            <CardTitle className="flex items-center gap-2 text-green-600 dark:text-green-400 text-sm">
+                                <Users size={18} /> Visita
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="p-4 pt-0">
+                            <p className="text-sm font-bold mt-1">Autorizar Entrada</p>
+                            <p className="text-xs text-muted-foreground">Pré-liberar visitante</p>
+                        </CardContent>
+                    </Card>
+                </div>
             </div>
 
             {/* Data Management Grid */}

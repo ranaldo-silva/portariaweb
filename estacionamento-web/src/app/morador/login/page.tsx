@@ -22,8 +22,10 @@ export default function LoginMorador() {
     const [confirmSenha, setConfirmSenha] = useState("");
 
     const handleCheckPhone = async () => {
-        if (!whatsapp || whatsapp.length < 8) {
-            setError("Digite um número válido.");
+        const cleanPhone = whatsapp.replace(/\D/g, "");
+
+        if (!cleanPhone || cleanPhone.length < 10) {
+            setError("Por favor, digite um número de WhatsApp válido (DDD + Número).");
             return;
         }
 
@@ -31,8 +33,6 @@ export default function LoginMorador() {
         setError("");
 
         try {
-            const cleanPhone = whatsapp.replace(/\D/g, "");
-
             const { data: moradores, error: dbError } = await supabase
                 .from('moradores')
                 .select('*');
@@ -41,8 +41,11 @@ export default function LoginMorador() {
 
             const morador = moradores?.find(m => {
                 const stored = (m.whatsapp || "").replace(/\D/g, "");
+                // Match exact, or with/without 55 prefix, or last 8/9 digits
                 if (!stored || stored.length < 8) return false;
-                return stored === cleanPhone || (stored.endsWith(cleanPhone) && cleanPhone.length >= 8) || (cleanPhone.endsWith(stored) && stored.length >= 8);
+                return stored === cleanPhone ||
+                    (stored.endsWith(cleanPhone)) ||
+                    (cleanPhone.endsWith(stored) && stored.length >= 8);
             });
 
             if (morador) {
@@ -53,11 +56,11 @@ export default function LoginMorador() {
                     setStep('PASSWORD');
                 }
             } else {
-                setError("Número não encontrado. Contate a portaria.");
+                setError("Número não encontrado no sistema. Verifique se digitou corretamente ou entre em contato com a portaria para atualizar seu cadastro.");
             }
         } catch (err) {
             console.error(err);
-            setError("Erro ao conectar.");
+            setError("Falha na conexão. Verifique sua internet e tente novamente.");
         } finally {
             setLoading(false);
         }
@@ -66,12 +69,15 @@ export default function LoginMorador() {
 
     const handleFirstAccess = async () => {
         const cleanCpf = cpf.replace(/\D/g, "");
-        if (!cleanCpf || cleanCpf.length < 11) {
-            setError("CPF inválido.");
+
+        if (!cleanCpf || cleanCpf.length !== 11) {
+            setError("Por favor, digite um CPF válido com 11 dígitos.");
             return;
         }
 
         setLoading(true);
+        setError("");
+
         try {
             // Auto-generate password from first 5 digits of CPF
             const generatedPassword = cleanCpf.substring(0, 5);
@@ -89,7 +95,7 @@ export default function LoginMorador() {
             loginSuccess({ ...tempMorador, cpf: cleanCpf, senha: generatedPassword });
         } catch (err) {
             console.error(err);
-            setError("Erro ao salvar cadastro. Tente novamente.");
+            setError("Ocorreu um erro ao salvar suas informações. Tente novamente em alguns instantes.");
         } finally {
             setLoading(false);
         }
@@ -97,12 +103,12 @@ export default function LoginMorador() {
 
     const handlePasswordLogin = async () => {
         if (!senha) {
-            setError("Digite sua senha.");
+            setError("Por favor, digite sua senha.");
             return;
         }
 
         if (senha !== tempMorador.senha) {
-            setError("Senha incorreta.");
+            setError("Senha incorreta. A senha inicial são os 5 primeiros números do seu CPF.");
             return;
         }
 
@@ -269,6 +275,14 @@ export default function LoginMorador() {
                                     />
                                 </div>
                             </div>
+
+                            {error && (
+                                <div className="bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 text-sm p-3 rounded-md flex items-center gap-2 font-medium border border-red-100 dark:border-red-900 animate-in fade-in slide-in-from-top-1">
+                                    <AlertTriangle size={18} className="shrink-0" />
+                                    <span>{error}</span>
+                                </div>
+                            )}
+
                             <Button
                                 className="w-full h-11 bg-blue-600 hover:bg-blue-700 dark:bg-gold dark:text-navy dark:hover:bg-gold-hover text-white font-bold text-md shadow-lg shadow-blue-500/30 dark:shadow-none transition-all"
                                 onClick={handleCheckPhone}
@@ -279,7 +293,7 @@ export default function LoginMorador() {
                             </Button>
                             <div className="relative flex items-center py-2">
                                 <div className="flex-grow border-t border-gray-300 dark:border-gray-600"></div>
-                                <span className="flex-shrink-0 mx-4 text-gray-400 text-xs uppercase">Sem cadastro?</span>
+                                <span className="flex-shrink-0 mx-4 text-gray-400 text-xs uppercase">OU</span>
                                 <div className="flex-grow border-t border-gray-300 dark:border-gray-600"></div>
                             </div>
 
@@ -311,6 +325,13 @@ export default function LoginMorador() {
                                     onChange={(e) => setCpf(e.target.value)}
                                 />
                             </div>
+
+                            {error && (
+                                <div className="bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 text-sm p-3 rounded-md flex items-center gap-2 font-medium border border-red-100 dark:border-red-900 animate-in fade-in slide-in-from-top-1">
+                                    <AlertTriangle size={18} className="shrink-0" />
+                                    <span>{error}</span>
+                                </div>
+                            )}
 
                             <Button
                                 className="w-full h-11 bg-green-600 hover:bg-green-700 text-white font-bold"

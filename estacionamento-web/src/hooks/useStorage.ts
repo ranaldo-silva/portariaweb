@@ -339,7 +339,8 @@ export const useStorage = () => {
                 data_visita: dados.dataHora,
                 apartamento: dados.apartamento,
                 bloco: dados.bloco,
-                foto_url: fotoUrl
+                foto_url: fotoUrl,
+                observacoes: dados.observacoes
             }]);
 
             return !error;
@@ -351,6 +352,56 @@ export const useStorage = () => {
             const { data } = await supabase.from('visitas').select('*').order('data_visita', { ascending: false });
             return data || [];
         } catch { return []; }
+    }, []);
+
+    // --- PRÉ-AUTORIZAÇÃO / AGENDAMENTO ---
+    const agendarVisita = useCallback(async (dados: any) => {
+        try {
+            const { error } = await supabase.from('pre_autorizacoes').insert([{
+                morador_id: dados.morador_id,
+                visitante_nome: formatarNomeProprio(dados.nome),
+                documento: dados.documento,
+                observacoes: dados.observacoes,
+                status: 'pendente'
+            }]);
+            return !error;
+        } catch { return false; }
+    }, []);
+
+    const getVisitasAgendadas = useCallback(async () => {
+        try {
+            const { data } = await supabase
+                .from('pre_autorizacoes')
+                .select(`*, moradores(nome_responsavel, apartamento, bloco)`)
+                .eq('status', 'pendente')
+                .order('created_at', { ascending: false });
+            return data || [];
+        } catch { return []; }
+    }, []);
+
+    const getHistoricoVisitas = useCallback(async (moradorId: string) => {
+        try {
+            const { data } = await supabase
+                .from('pre_autorizacoes')
+                .select('*')
+                .eq('morador_id', moradorId)
+                .order('created_at', { ascending: false });
+            return data || [];
+        } catch { return []; }
+    }, []);
+
+    const concluirAgendamento = useCallback(async (id: string) => {
+        try {
+            const { error } = await supabase.from('pre_autorizacoes').update({ status: 'realizada' }).eq('id', id);
+            return !error;
+        } catch { return false; }
+    }, []);
+
+    const cancelarAgendamento = useCallback(async (id: string) => {
+        try {
+            const { error } = await supabase.from('pre_autorizacoes').update({ status: 'cancelada' }).eq('id', id);
+            return !error;
+        } catch { return false; }
     }, []);
 
     // --- ALERTAS ---
@@ -491,7 +542,9 @@ export const useStorage = () => {
         enviarAlerta, getAlertas, removerAlerta, editarAlerta,
         salvarPlantao, getPlantao, getHistoricoPlantoes,
         loginAdmin, cadastroAdmin, removerMoradorBase,
-        removerPrestador, removerVisita, atualizarEncomenda
+        removerPrestador, removerVisita, atualizarEncomenda,
+        agendarVisita, getVisitasAgendadas, concluirAgendamento, cancelarAgendamento,
+        getHistoricoVisitas
     };
 };
 
