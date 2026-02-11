@@ -124,6 +124,40 @@ export function DetailsModal({ isOpen, onClose, title, data, type = 'morador', o
                                     )}
                                 </>
                             )}
+
+                            {/* Visit Specific */}
+                            {type === 'visita' && (
+                                <>
+                                    <div className="flex flex-col items-center mb-4">
+                                        {data.foto_url ? (
+                                            <img
+                                                src={data.foto_url}
+                                                alt="Foto Visitante"
+                                                className="w-full max-h-80 object-contain rounded-lg border-2 border-gold shadow-lg bg-black"
+                                            />
+                                        ) : (
+                                            <div className="w-full h-48 bg-navy-light flex items-center justify-center border border-dashed border-gray-600 rounded-lg">
+                                                <p className="text-gray-400">Sem foto registrada</p>
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div className="grid grid-cols-1 gap-2 text-lg">
+                                        <p><strong className="text-gold">Visitante:</strong> {data.visitante_nome}</p>
+                                        <p><strong className="text-gold">Documento:</strong> {data.documento || "Não informado"}</p>
+                                        <p><strong className="text-gold">Data/Hora:</strong> {new Date(data.data_visita).toLocaleString('pt-BR')}</p>
+                                        <div className="bg-navy-light p-3 rounded border border-gray-700 mt-2">
+                                            <strong className="text-gold block mb-1">Destino:</strong>
+                                            <p className="text-xl font-bold">AP {data.apartamento} - {data.bloco}</p>
+                                        </div>
+                                        {data.observacoes && (
+                                            <div className="mt-2 text-yellow-500 italic">
+                                                <strong className="block text-sm not-italic text-gold">Observações:</strong>
+                                                "{data.observacoes}"
+                                            </div>
+                                        )}
+                                    </div>
+                                </>
+                            )}
                         </>
                     )}
 
