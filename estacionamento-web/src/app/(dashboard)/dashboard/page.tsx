@@ -15,31 +15,35 @@ import { DetailsModal } from '@/components/DetailsModal';
 
 export default function Dashboard() {
     const router = useRouter();
-    const { sincronizarMoradores, getVeiculos, removerVeiculo, getEncomendasAtivas } = useStorage();
+    const { sincronizarMoradores, getVeiculos, removerVeiculo, getEncomendasAtivas, getVisitas } = useStorage(); // Added getVisitas
 
     const [busca, setBusca] = useState('');
     const [moradores, setMoradores] = useState<any[]>([]);
     const [ativos, setAtivos] = useState<any[]>([]);
     const [encomendas, setEncomendas] = useState<any[]>([]);
+    const [visitas, setVisitas] = useState<any[]>([]); // Added visits state
     const [loading, setLoading] = useState(false);
     const [vagaSel, setVagaSel] = useState<any>(null);
-    const [itemDetalhes, setItemDetalhes] = useState<any>(null); // New state for modal
+    const [itemDetalhes, setItemDetalhes] = useState<any>(null);
+    const [tipoDetalhes, setTipoDetalhes] = useState<'morador' | 'visita'>('morador'); // Added type state
     const [filtroMoto, setFiltroMoto] = useState(false);
-    const [filtroBloco, setFiltroBloco] = useState(''); // '' = Todos
+    const [filtroBloco, setFiltroBloco] = useState('');
 
-    const [novoAlerta, setNovoAlerta] = useState<any>(null); // State for realtime alert
+    const [novoAlerta, setNovoAlerta] = useState<any>(null);
 
     const carregarDados = async () => {
         setLoading(true);
         try {
-            const [m, v, e] = await Promise.all([
+            const [m, v, e, vis] = await Promise.all([ // Added visits fetch
                 sincronizarMoradores(),
                 getVeiculos(),
-                getEncomendasAtivas()
+                getEncomendasAtivas(),
+                getVisitas()
             ]);
             setMoradores(m || []);
             setAtivos(v || []);
             setEncomendas(e || []);
+            setVisitas(vis || []); // Set visits
         } catch (err) {
             console.error(err);
         } finally {
@@ -50,7 +54,6 @@ export default function Dashboard() {
     useEffect(() => {
         carregarDados();
 
-        // Realtime Subscription for Alerts
         const channel = supabase
             .channel('alertas-realtime')
             .on(
@@ -59,7 +62,6 @@ export default function Dashboard() {
                 (payload) => {
                     console.log('Novo Alerta Recebido:', payload);
                     setNovoAlerta(payload.new);
-                    // Optional: Play sound here if desired in future
                 }
             )
             .subscribe();
@@ -90,7 +92,6 @@ export default function Dashboard() {
         if (termo === "" && !filtroMoto && !filtroBloco) return false;
         if (termo === "") return true;
 
-        // Deep search including Dependents (lista_moradores/dependentes)
         const dependentes = String(m.lista_moradores || m.lista_morador || m.dependentes || "");
         const campos = [
             m.nome_responsavel,
@@ -163,7 +164,7 @@ export default function Dashboard() {
                             <div
                                 key={m.id}
                                 className="flex items-start gap-3 p-3 border-b border-gray-700 last:border-0 hover:bg-navy/50 cursor-pointer"
-                                onClick={() => setItemDetalhes(m)} // Open modal on click
+                                onClick={() => { setItemDetalhes(m); setTipoDetalhes('morador'); }}
                             >
                                 <div className={cn("h-10 w-10 rounded-full flex items-center justify-center font-bold", m.moto_detalhes ? "bg-gold text-black" : "bg-blue-900 text-white")}>
                                     {m.apartamento}
@@ -173,7 +174,6 @@ export default function Dashboard() {
                                     <p className="text-xs text-gray-400 line-clamp-2">
                                         {m.carro_detalhes} {m.moto_detalhes && `| 🏍️ ${m.moto_detalhes}`}
                                     </p>
-                                    {/* Show matched dependent if pertinent? For now just showing details modal is enough */}
                                     {temEncomenda && <span className="text-xs font-bold text-gold flex items-center gap-1 mt-1"><Package size={12} /> TEM ENCOMENDA</span>}
                                 </div>
                             </div>
@@ -181,6 +181,36 @@ export default function Dashboard() {
                     })}
                 </div>
             )}
+
+            {/* VISIT HISTORY (New Section) */}
+            <div className="bg-navy-light rounded-lg border border-gold/30 p-4">
+                <div className="flex justify-between items-center mb-3">
+                    <h3 className="text-gold font-bold flex items-center gap-2"><UserIcon size={16} /> Últimas Visitas</h3>
+                    <Button variant="link" size="sm" onClick={() => router.push('/visitas')} className="text-gray-400 text-xs">Ver Todas</Button>
+                </div>
+                <div className="space-y-2 max-h-60 overflow-y-auto">
+                    {visitas.slice(0, 5).map(v => (
+                        <div
+                            key={v.id}
+                            className="flex items-center gap-3 p-2 bg-navy border border-gray-700 rounded cursor-pointer hover:bg-navy/80"
+                            onClick={() => { setItemDetalhes(v); setTipoDetalhes('visita'); }}
+                        >
+                            {v.foto_url ? (
+                                <img src={v.foto_url} className="w-10 h-10 rounded-full object-cover border border-gold" />
+                            ) : (
+                                <div className="w-10 h-10 rounded-full bg-navy-light flex items-center justify-center border border-gold">
+                                    <UserIcon size={16} className="text-gold" />
+                                </div>
+                            )}
+                            <div className="flex-1">
+                                <p className="font-bold text-white text-sm">{v.visitante_nome}</p>
+                                <p className="text-xs text-gray-400">AP {v.apartamento} {v.bloco} • {new Date(v.data_visita).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                            </div>
+                        </div>
+                    ))}
+                    {visitas.length === 0 && <p className="text-gray-500 text-sm text-center py-2">Nenhuma visita recente.</p>}
+                </div>
+            </div>
 
             {/* MAP GRID */}
             <div>
@@ -211,7 +241,7 @@ export default function Dashboard() {
                 </div>
             </div>
 
-            {/* MODAL VAGA (Simple Overlay) - Keeping strict control over this specific one */}
+            {/* MODAL VAGA (Simple Overlay) */}
             {vagaSel && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in">
                     <Card className="w-full max-w-md bg-navy border-gold shadow-2xl">
@@ -251,15 +281,16 @@ export default function Dashboard() {
                 </div>
             )}
 
-            {/* NEW DETAILS MODAL */}
+            {/* DETAILS MODAL - Connected to both Morador and Visita */}
             <DetailsModal
                 isOpen={!!itemDetalhes}
                 onClose={() => setItemDetalhes(null)}
-                title={itemDetalhes?.nome_responsavel || "Detalhes"}
+                title={tipoDetalhes === 'visita' ? 'Detalhes da Visita' : (itemDetalhes?.nome_responsavel || "Detalhes")}
                 data={itemDetalhes}
-                type="morador"
+                type={tipoDetalhes}
             />
-            {/* NEW ALERT REALTIME MODAL */}
+
+            {/* REALTIME ALERT MODAL */}
             {novoAlerta && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 backdrop-blur p-4 animate-in theme-red">
                     <Card className="w-full max-w-2xl bg-red-900 border-4 border-red-500 shadow-[0_0_50px_rgba(239,68,68,0.5)] animate-pulse">
