@@ -5,6 +5,8 @@ export const metadata: Metadata = {
     description: "Acesso exclusivo para moradores",
 };
 
+import NotificationsWrapper from "./NotificationsWrapper";
+
 export default function MoradorLayout({
     children,
 }: {
@@ -17,7 +19,9 @@ export default function MoradorLayout({
                 <h1 className="text-gold font-bold text-lg">Área do Morador</h1>
             </header>
             <main className="p-4">
-                {children}
+                <NotificationsWrapper>
+                    {children}
+                </NotificationsWrapper>
             </main>
         </div>
     );

@@ -10,6 +10,19 @@ export const useStorage = () => {
     // --- HELPERS (Memoized or internal) ---
     // Moved to @/lib/utils
 
+    // Helper to trigger notification
+    const notifyUser = async (userId: number, title: string, body: string, data: any = {}) => {
+        try {
+            await fetch('/api/notifications/send', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ userId, title, body, data })
+            });
+        } catch (e) {
+            console.error("Failed to send notification", e);
+        }
+    };
+
     // --- MORADORES ---
     // CACHE LOGIC: 5 minutes validity
     const sincronizarMoradores = useCallback(async (force = false) => {
@@ -208,6 +221,18 @@ export const useStorage = () => {
                 data_chegada: new Date().toISOString(),
                 destinatario: destinatario // Save recipient name
             }]);
+
+            if (!error) {
+                // Determine resident ID to notify (assuming morador object has id)
+                const moradorId = morador.id;
+                notifyUser(
+                    moradorId,
+                    "📦 Nova Encomenda Chegou!",
+                    `Sua encomenda de ${origem} está na portaria. Token: ${token}`,
+                    { type: 'encomenda', token }
+                );
+            }
+
             return !error;
         } catch (e) {
             return false;
@@ -343,6 +368,26 @@ export const useStorage = () => {
                 observacoes: dados.observacoes
             }]);
 
+            if (!error) {
+                // Determine resident ID to notify - simplified lookup
+                const { data: morador } = await supabase
+                    .from('moradores')
+                    .select('id')
+                    .eq('apartamento', dados.apartamento)
+                    .eq('bloco', dados.bloco)
+                    .limit(1)
+                    .single();
+
+                if (morador) {
+                    notifyUser(
+                        morador.id,
+                        "👤 Nova Visita",
+                        `${formatarNomeProprio(dados.nome)} está na portaria para o AP ${dados.apartamento}`,
+                        { type: 'visita', visitante: dados.nome }
+                    );
+                }
+            }
+
             return !error;
         } catch (e) { return false; }
     }, []);
@@ -414,6 +459,13 @@ export const useStorage = () => {
                 data_hora: new Date().toISOString(),
                 autor: dados.autor || 'Portaria Principal'
             }]);
+            if (!error) {
+                // Broadcast to all residents? 
+                // Currently API only supports single userId. 
+                // We would need a topic subscription or iterate.
+                // For this MVP, we might skip or implement a loop if needed.
+                // Let's implement a topic 'all_residents' in the future.
+            }
             return !error;
         } catch { return false; }
     }, []);
