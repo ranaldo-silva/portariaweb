@@ -28,10 +28,32 @@ messaging.onBackgroundMessage(function (payload) {
     const notificationTitle = payload.notification.title;
     const notificationOptions = {
         body: payload.notification.body,
-        icon: '/icon-192x192.png', // Ensure this icon exists or use a default
+        icon: '/vercel.svg', // Ensure this icon exists or use a default
         // customize further
         tag: 'portaria-notification'
     };
 
     self.registration.showNotification(notificationTitle, notificationOptions);
+});
+
+self.addEventListener('notificationclick', function (event) {
+    console.log('[firebase-messaging-sw.js] Notification click received.');
+    event.notification.close();
+
+    event.waitUntil(
+        clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function (windowClients) {
+            // Check if there is already a window/tab open with the target URL
+            for (var i = 0; i < windowClients.length; i++) {
+                var client = windowClients[i];
+                // Adjust the URL to match your app's structure
+                if (client.url.indexOf('/morador') !== -1 && 'focus' in client) {
+                    return client.focus();
+                }
+            }
+            // If no window/tab is open, open a new one
+            if (clients.openWindow) {
+                return clients.openWindow('/morador/dashboard');
+            }
+        })
+    );
 });

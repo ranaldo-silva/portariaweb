@@ -13,9 +13,20 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-export const metadata: Metadata = {
-  title: "Smart Portaria",
+title: "Smart Portaria",
   description: "Sistema Integrado de Portaria Inteligente",
+    manifest: "/manifest.json",
+      themeColor: "#1e3a8a",
+        appleWebApp: {
+  capable: true,
+    statusBarStyle: "default",
+      title: "Portaria Web",
+  },
+viewport: {
+  width: "device-width",
+    initialScale: 1,
+      maximumScale: 1,
+  },
 };
 
 export default function RootLayout({

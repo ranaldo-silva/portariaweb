@@ -89,7 +89,7 @@ export const useFcmToken = () => {
                     // alert(`🔔 ${title}\n${body}`); 
 
                     // Better Option: Browser Notification API even if in foreground (if supported)
-                    new Notification(title, { body, icon: '/icon-192x192.png' });
+                    new Notification(title, { body, icon: '/vercel.svg' });
                 }
             });
             return () => unsubscribe();
