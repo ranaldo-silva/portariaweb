@@ -36,6 +36,7 @@ export default function LoginPage() {
 
         if (isAdmin) {
             localStorage.setItem('userRole', 'admin');
+            localStorage.setItem('admin_email', email); // Save email for token registration
             router.push('/dashboard');
             return;
         }

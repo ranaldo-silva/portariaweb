@@ -31,12 +31,31 @@ export const useFcmToken = () => {
                             setToken(currentToken);
                             console.log("FCM Token retrieved:", currentToken); // Debug Log
 
-                            // Save token to Supabase for the current user using RPC to bypass RLS
+                            // Save token to Supabase based on Role
                             const sessionId = localStorage.getItem("morador_session_id");
-                            console.log("Session ID content:", sessionId); // Debug Log
+                            const role = localStorage.getItem("userRole"); // 'admin' or 'porteiro' or null (morador default)
 
-                            if (sessionId) {
-                                // Use new RPC for multi-device support
+                            console.log(`Saving Token. Role: ${role}, Session: ${sessionId}`);
+
+                            if (role === 'admin') {
+                                // For admins, we use the email stored in a different key or assume standard logic
+                                // Since we don't have 'admin_session_id', we might need to store admin email on login
+                                // Let's check if we have it. If not, we can't save personalized token yet.
+                                // NOTE: Client must ensure 'admin_email' is saved on login.
+                                const adminEmail = localStorage.getItem("admin_email");
+
+                                if (adminEmail) {
+                                    const { error } = await supabase.rpc('save_admin_token', {
+                                        p_email: adminEmail,
+                                        p_token: currentToken
+                                    });
+                                    if (error) console.error("Error saving Admin token:", error);
+                                    else console.log("Admin token saved successfully.");
+                                } else {
+                                    console.warn("No admin email found in localStorage. Admin token not saved.");
+                                }
+                            } else if (sessionId) {
+                                // Resident Logic (Existing)
                                 const { error } = await supabase.rpc('save_notification_token', {
                                     p_user_id: parseInt(sessionId),
                                     p_token: currentToken
@@ -48,7 +67,7 @@ export const useFcmToken = () => {
                                     console.log("FCM token saved via RPC (Multi-Device) successfully.");
                                 }
                             } else {
-                                console.warn("No session ID found in localStorage. Token not saved.");
+                                console.warn("No session ID or admin email found in localStorage. Token not saved.");
                             }
                         } else {
                             console.log('No registration token available.');
