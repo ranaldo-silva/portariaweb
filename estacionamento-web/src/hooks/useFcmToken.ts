@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { getToken } from 'firebase/messaging';
+import { getToken, onMessage } from 'firebase/messaging';
 import { messaging } from '@/lib/firebase';
 import { supabase } from '@/lib/supabase';
 
@@ -14,16 +14,14 @@ export const useFcmToken = () => {
         const retrieveToken = async () => {
             try {
                 if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
-                    // Register the service worker specially for Firebase if not already
-                    // Note: Next.js PWA plugin might already register one. 
-                    // We need to ensure firebase-messaging-sw.js is the one being used or imported.
-                    // For Simplicity, we rely on the default registration or explicit registration here.
-
                     const permission = await Notification.requestPermission();
                     setNotificationPermissionStatus(permission);
 
                     if (permission === 'granted') {
-                        if (!messaging) return; // Firebase might not be initialized
+                        if (!messaging) {
+                            console.error("Firebase messaging not initialized.");
+                            return;
+                        }
 
                         const currentToken = await getToken(messaging, {
                             vapidKey: VAPID_KEY,
@@ -31,16 +29,38 @@ export const useFcmToken = () => {
 
                         if (currentToken) {
                             setToken(currentToken);
-                            // Save token to Supabase for the current user
+                            console.log("FCM Token retrieved:", currentToken); // Debug Log
+
+                            // Save token to Supabase for the current user using RPC to bypass RLS
                             const sessionId = localStorage.getItem("morador_session_id");
+                            console.log("Session ID content:", sessionId); // Debug Log
+
                             if (sessionId) {
-                                await supabase
-                                    .from('moradores')
-                                    .update({ fcm_token: currentToken })
-                                    .eq('id', sessionId);
+                                const { error } = await supabase.rpc('set_fcm_token', {
+                                    p_user_id: parseInt(sessionId),
+                                    p_token: currentToken
+                                });
+
+                                if (error) {
+                                    console.error("Error saving FCM token via RPC:", error);
+                                    // Fallback to direct update if RPC fails (e.g. not created yet)
+                                    const { error: directError } = await supabase
+                                        .from('moradores')
+                                        .update({ fcm_token: currentToken })
+                                        .eq('id', sessionId);
+
+                                    if (directError) {
+                                        console.error("Error saving FCM token via Direct Update:", directError);
+                                        alert("Erro ao salvar token. Por favor, avise a portaria.");
+                                    }
+                                } else {
+                                    console.log("FCM token saved via RPC successfully.");
+                                }
+                            } else {
+                                console.warn("No session ID found in localStorage. Token not saved.");
                             }
                         } else {
-                            console.log('No registration token available. Request permission to generate one.');
+                            console.log('No registration token available.');
                         }
                     }
                 }
@@ -50,6 +70,30 @@ export const useFcmToken = () => {
         };
 
         retrieveToken();
+    }, []);
+
+    // Listen for foreground messages
+    useEffect(() => {
+        if (typeof window !== 'undefined' && 'serviceWorker' in navigator && messaging) {
+            const unsubscribe = onMessage(messaging, (payload) => {
+                console.log('Foreground Message received:', payload);
+                const { title, body } = payload.notification || {};
+
+                // Show a simple browser alert or custom toast
+                // Using alert for immediate visibility in testing, can swap for toast later
+                if (title) {
+                    // Start vibrate pattern for mobile
+                    if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+
+                    // Option: Create a visible HTML element or use alert
+                    // alert(`🔔 ${title}\n${body}`); 
+
+                    // Better Option: Browser Notification API even if in foreground (if supported)
+                    new Notification(title, { body, icon: '/icon-192x192.png' });
+                }
+            });
+            return () => unsubscribe();
+        }
     }, []);
 
     return { fcmToken: token, notificationPermissionStatus };

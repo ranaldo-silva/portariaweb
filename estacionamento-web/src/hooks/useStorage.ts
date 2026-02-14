@@ -12,14 +12,17 @@ export const useStorage = () => {
 
     // Helper to trigger notification
     const notifyUser = async (userId: number, title: string, body: string, data: any = {}) => {
+        console.log(`[notifyUser] Triggering notification for User ${userId}`, { title, body });
         try {
-            await fetch('/api/notifications/send', {
+            const res = await fetch('/api/notifications/send', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ userId, title, body, data })
             });
+            const json = await res.json();
+            console.log("[notifyUser] API Response:", json);
         } catch (e) {
-            console.error("Failed to send notification", e);
+            console.error("[notifyUser] Failed to send notification", e);
         }
     };
 
