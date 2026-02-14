@@ -35,7 +35,17 @@ export default function ChatWidget() {
         const channel = supabase
             .channel('chat_room')
             .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chat_messages' }, (payload) => {
-                setMessages((prev) => [...prev, payload.new as Message]);
+                const newMsg = payload.new as Message;
+                setMessages((prev) => [...prev, newMsg]);
+
+                // Auto-open if message is not from me
+                if (newMsg.sender_role !== role) {
+                    setIsOpen(true);
+                    // Play notification sound (optional, simple beep)
+                    // const audio = new Audio('/notification.mp3'); 
+                    // audio.play().catch(e => console.log(e));
+                }
+
                 // Scroll to bottom on new message
                 setTimeout(() => scrollRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
             })
@@ -115,8 +125,8 @@ export default function ChatWidget() {
                                 return (
                                     <div key={msg.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
                                         <div className={`max-w-[80%] p-2 rounded-lg text-xs ${isMe
-                                                ? 'bg-blue-100 text-blue-900 rounded-tr-none'
-                                                : 'bg-gray-100 text-gray-900 rounded-tl-none'
+                                            ? 'bg-blue-100 text-blue-900 rounded-tr-none'
+                                            : 'bg-gray-100 text-gray-900 rounded-tl-none'
                                             }`}>
                                             <p className="font-bold text-[10px] opacity-70 mb-1">
                                                 {msg.sender_role === 'admin' ? 'Administração' : 'Portaria'}
