@@ -10,16 +10,17 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: 'Missing userId or title' }, { status: 400 });
         }
 
-        // 1. Get user's FCM token from Supabase (Try RPC first to bypass RLS)
-        let tokenToUse = null;
+        // 1. Get all user's FCM tokens from Supabase (Multi-device support)
+        let tokens: string[] = [];
 
-        const { data: rpcToken, error: rpcError } = await supabase
-            .rpc('get_fcm_token', { p_user_id: userId });
+        // Try getting from new table first
+        const { data: userTokens, error: rpcError } = await supabase
+            .rpc('get_user_tokens', { p_user_id: userId });
 
-        if (!rpcError && rpcToken) {
-            tokenToUse = rpcToken;
+        if (!rpcError && userTokens && userTokens.length > 0) {
+            tokens = userTokens.map((t: any) => t.token);
         } else {
-            // Fallback to direct select
+            // Fallback to legacy single token column
             const { data: user, error } = await supabase
                 .from('moradores')
                 .select('fcm_token')
@@ -27,30 +28,47 @@ export async function POST(req: NextRequest) {
                 .single();
 
             if (user && user.fcm_token) {
-                tokenToUse = user.fcm_token;
+                tokens = [user.fcm_token];
             }
         }
 
-        if (!tokenToUse) {
-            console.log(`User ${userId} has no FCM token (RPC/Direct failed)`);
-            return NextResponse.json({ message: 'User has no token' }, { status: 200 });
+        if (tokens.length === 0) {
+            console.log(`User ${userId} has no FCM tokens`);
+            return NextResponse.json({ message: 'User has no tokens' }, { status: 200 });
         }
 
+        console.log(`Sending notification to ${tokens.length} devices for User ${userId}`);
+
+        // 2. Send via Firebase Admin (Multicast)
         const message = {
             notification: {
                 title,
                 body,
             },
             data: data || {},
-            token: tokenToUse,
+            tokens: tokens, // Use 'tokens' array for multicast
         };
 
-        // 2. Send via Firebase Admin
-        console.log(`Sending notification to token: ${tokenToUse.substring(0, 10)}...`);
-        const response = await firebaseAdmin.messaging().send(message);
-        console.log("Notification sent successfully. Message ID:", response);
+        const response = await firebaseAdmin.messaging().sendEachForMulticast(message);
+        console.log(`Notifications sent/failed: ${response.successCount}/${response.failureCount}`);
 
-        return NextResponse.json({ success: true, messageId: response });
+        // Optional: Cleanup invalid tokens
+        if (response.failureCount > 0) {
+            const failedTokens: string[] = [];
+            response.responses.forEach((resp: any, idx: number) => {
+                if (!resp.success) {
+                    failedTokens.push(tokens[idx]);
+                }
+            });
+            console.log("Failed tokens to potentially remove:", failedTokens);
+            // TODO: Remove failed tokens from DB using an RPC
+        }
+
+        return NextResponse.json({
+            success: true,
+            successCount: response.successCount,
+            failureCount: response.failureCount
+        });
     } catch (error: any) {
         console.error('Error sending notification (Server):', error);
         return NextResponse.json({ error: error.message }, { status: 500 });

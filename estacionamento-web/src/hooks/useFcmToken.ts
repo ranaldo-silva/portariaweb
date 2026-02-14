@@ -36,25 +36,16 @@ export const useFcmToken = () => {
                             console.log("Session ID content:", sessionId); // Debug Log
 
                             if (sessionId) {
-                                const { error } = await supabase.rpc('set_fcm_token', {
+                                // Use new RPC for multi-device support
+                                const { error } = await supabase.rpc('save_notification_token', {
                                     p_user_id: parseInt(sessionId),
                                     p_token: currentToken
                                 });
 
                                 if (error) {
                                     console.error("Error saving FCM token via RPC:", error);
-                                    // Fallback to direct update if RPC fails (e.g. not created yet)
-                                    const { error: directError } = await supabase
-                                        .from('moradores')
-                                        .update({ fcm_token: currentToken })
-                                        .eq('id', sessionId);
-
-                                    if (directError) {
-                                        console.error("Error saving FCM token via Direct Update:", directError);
-                                        alert("Erro ao salvar token. Por favor, avise a portaria.");
-                                    }
                                 } else {
-                                    console.log("FCM token saved via RPC successfully.");
+                                    console.log("FCM token saved via RPC (Multi-Device) successfully.");
                                 }
                             } else {
                                 console.warn("No session ID found in localStorage. Token not saved.");
