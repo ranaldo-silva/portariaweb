@@ -717,7 +717,7 @@ export const useStorage = () => {
         enviarAlerta, getAlertas, removerAlerta, editarAlerta,
         salvarPlantao, getPlantao, getHistoricoPlantoes,
         loginAdmin, cadastroAdmin, removerMoradorBase,
-        removerPrestador, removerVisita, atualizarEncomenda,
+        removerPrestador, atualizarEncomenda,
         agendarVisita, getVisitasAgendadas, concluirAgendamento, cancelarAgendamento,
         getHistoricoVisitas
     };
