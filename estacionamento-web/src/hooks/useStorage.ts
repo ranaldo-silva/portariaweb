@@ -589,7 +589,127 @@ export const useStorage = () => {
         } catch { return false; }
     }, []);
 
+    // --- ENCOMENDAS INCOMPLETAS ---
+    const registrarEncomendaIncompleta = useCallback(async (dados: { fotoFile?: File, descricao: string, porteiro: string }) => {
+        try {
+            const fotoUrl = dados.fotoFile ? await startUpload(dados.fotoFile, 'encomendas') : "";
+            const { error } = await supabase.from('encomendas_incompletas').insert([{
+                foto_url: fotoUrl,
+                descricao: dados.descricao,
+                registrado_por: dados.porteiro
+            }]);
+            return !error;
+        } catch { return false; }
+    }, []);
+
+    const getEncomendasIncompletas = useCallback(async () => {
+        try {
+            const { data } = await supabase
+                .from('encomendas_incompletas')
+                .select('*')
+                .eq('status', 'pendente')
+                .order('data_chegada', { ascending: false });
+            return data || [];
+        } catch { return []; }
+    }, []);
+
+    const resolverEncomendaIncompleta = useCallback(async (
+        idIncompleta: number,
+        dadosReais: { moradorId: number, destinatario: string, descricao: string, fotoUrl: string, retiradoPor: string }
+    ) => {
+        try {
+            // 0. Fetch Resident Details (Ap/Bloco)
+            const { data: morador, error: morError } = await supabase
+                .from('moradores')
+                .select('apartamento, bloco, lista_moradores')
+                .eq('id', dadosReais.moradorId)
+                .single();
+
+            if (morError || !morador) throw new Error("Morador não encontrado");
+
+            // 1. Insert into Real Table
+            const { error: insertError } = await supabase.from('encomendas').insert([{
+                morador_id: dadosReais.moradorId,
+                apartamento: morador.apartamento,
+                bloco: morador.bloco,
+                destinatario: dadosReais.destinatario,
+                origem: dadosReais.descricao || "Entrega Rápida", // Use description as origin
+                foto_url: dadosReais.fotoUrl,
+                data_chegada: new Date().toISOString(),
+                status: 'Retirado', // Correct status
+                retirado_por: dadosReais.retiradoPor,
+                data_retirada: new Date().toISOString(),
+                token: Math.floor(1000 + Math.random() * 9000).toString() // Generate dummy token
+            }]);
+
+            if (insertError) {
+                console.error("Erro ao inserir encomenda:", insertError);
+                throw insertError;
+            }
+
+            // 2. Mark Incomplete as Resolved
+            const { error: updateError } = await supabase
+                .from('encomendas_incompletas')
+                .update({ status: 'identificado' })
+                .eq('id', idIncompleta);
+
+            if (updateError) throw updateError;
+
+            // 3. Update Resident List Directly (User Request: "tem que ser salva na tabela moradores")
+            const lista = String(morador.lista_moradores || "").toLowerCase();
+            const novoNome = dadosReais.destinatario;
+
+            if (!lista.includes(novoNome.toLowerCase())) {
+                const novaLista = morador.lista_moradores ? `${morador.lista_moradores}, ${novoNome}` : novoNome;
+
+                const { error: updateMoradorError } = await supabase
+                    .from('moradores')
+                    .update({ lista_moradores: novaLista })
+                    .eq('id', dadosReais.moradorId);
+
+                if (updateMoradorError) console.error("Erro ao atualizar lista de moradores:", updateMoradorError);
+            }
+
+            return true;
+        } catch (e: any) {
+            console.error("Erro em resolverEncomendaIncompleta:", e);
+            alert("Erro: " + (e.message || JSON.stringify(e)));
+            return false;
+        }
+    }, []);
+
+    // --- SOLICITAÇÕES (Portaria/Morador) ---
+    const solicitarAlteracao = useCallback(async (id: number, dados: any) => {
+        try {
+            const { error } = await supabase.from('solicitacoes').insert([{
+                tipo: 'atualizacao_cadastral',
+                morador_id: id,
+                dados_novos: dados,
+                status: 'pendente'
+            }]);
+            return !error;
+        } catch { return false; }
+    }, []);
+
+    const solicitarNovoCadastro = useCallback(async (dados: any) => {
+        try {
+            const { error } = await supabase.from('solicitacoes').insert([{
+                tipo: 'novo_cadastro',
+                dados_novos: dados,
+                status: 'pendente'
+            }]);
+            return !error;
+        } catch { return false; }
+    }, []);
+
     return {
+        // ... (existing exports)
+        removerVisita,
+        solicitarAlteracao,
+        solicitarNovoCadastro,
+        registrarEncomendaIncompleta,
+        getEncomendasIncompletas,
+        resolverEncomendaIncompleta,
         sincronizarMoradores, salvarMoradorBase, getMoradoresBase,
         getVeiculos, salvarVeiculo, removerVeiculo, getHistorico, limparHistorico, limparAtivos,
         registrarEncomenda, getEncomendasAtivas, getTodasEncomendas, validarTokenRetirada, removerEncomenda,

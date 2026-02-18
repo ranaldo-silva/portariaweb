@@ -14,7 +14,8 @@ import {
     NotebookPen,
     Megaphone,
     LogOut,
-    Menu
+    Menu,
+    Clock
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
@@ -23,10 +24,12 @@ const menuItems = [
     { name: "Mapa de Vagas", href: "/dashboard", icon: MapPin },
     { name: "Ocupar Vaga", href: "/veiculos/novo", icon: CreditCard },
     { name: "Encomendas", href: "/encomendas", icon: Package },
+    { name: "Encomendas Rápidas", href: "/encomendas/rapida", icon: Clock },
     { name: "Moradores", href: "/moradores", icon: Users, admin: true },
     { name: "Prestadores", href: "/prestadores", icon: HardHat },
     { name: "Visitas", href: "/visitas", icon: UserCog },
     { name: "Alertas", href: "/alertas", icon: Megaphone },
+    { name: "Gestão Unidades", href: "/portaria/cadastro", icon: Users },
     { name: "Livro Plantão", href: "/plantao", icon: NotebookPen },
     { name: "Painel Síndica", href: "/admin", icon: LayoutDashboard, admin: true },
 ];
