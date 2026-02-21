@@ -1,6 +1,5 @@
-import * as admin from 'firebase-admin';
-
-export function getFirebaseAdmin() {
+export async function getFirebaseAdmin() {
+    const admin = await import('firebase-admin');
     if (!admin.apps.length) {
         try {
             admin.initializeApp({

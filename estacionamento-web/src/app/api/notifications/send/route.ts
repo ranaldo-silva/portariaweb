@@ -51,7 +51,7 @@ export async function POST(req: NextRequest) {
             tokens: tokens, // Use 'tokens' array for multicast
         };
 
-        const adminApp = getFirebaseAdmin();
+        const adminApp = await getFirebaseAdmin();
         const response = await adminApp.messaging().sendEachForMulticast(message);
         console.log(`Notifications sent/failed: ${response.successCount}/${response.failureCount}`);
 

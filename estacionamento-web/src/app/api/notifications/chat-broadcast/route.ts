@@ -26,7 +26,7 @@ export async function POST(req: NextRequest) {
             tokens: tokens
         };
 
-        const adminApp = getFirebaseAdmin();
+        const adminApp = await getFirebaseAdmin();
         const response = await adminApp.messaging().sendEachForMulticast(payload);
 
         return NextResponse.json({ success: true, count: response.successCount });
