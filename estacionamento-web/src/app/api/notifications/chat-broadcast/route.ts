@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { firebaseAdmin } from '@/lib/firebase-admin';
+import { getFirebaseAdmin } from '@/lib/firebase-admin';
 import { supabase } from '@/lib/supabase';
 
 export const dynamic = 'force-dynamic';
@@ -26,7 +26,8 @@ export async function POST(req: NextRequest) {
             tokens: tokens
         };
 
-        const response = await firebaseAdmin.messaging().sendEachForMulticast(payload);
+        const adminApp = getFirebaseAdmin();
+        const response = await adminApp.messaging().sendEachForMulticast(payload);
 
         return NextResponse.json({ success: true, count: response.successCount });
     } catch (error: any) {

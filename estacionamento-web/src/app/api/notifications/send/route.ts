@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { firebaseAdmin } from '@/lib/firebase-admin';
+import { getFirebaseAdmin } from '@/lib/firebase-admin';
 import { supabase } from '@/lib/supabase';
 
 export const dynamic = 'force-dynamic';
@@ -51,7 +51,8 @@ export async function POST(req: NextRequest) {
             tokens: tokens, // Use 'tokens' array for multicast
         };
 
-        const response = await firebaseAdmin.messaging().sendEachForMulticast(message);
+        const adminApp = getFirebaseAdmin();
+        const response = await adminApp.messaging().sendEachForMulticast(message);
         console.log(`Notifications sent/failed: ${response.successCount}/${response.failureCount}`);
 
         // Optional: Cleanup invalid tokens
