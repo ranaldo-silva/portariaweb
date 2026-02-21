@@ -4,8 +4,11 @@ import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { MessageCircle, X, Send } from 'lucide-react';
+import { MessageCircle } from 'lucide-react';
+import { ChatHeader } from './chat/ChatHeader';
+import { ChatDateSeparator } from './chat/ChatDateSeparator';
+import { ChatMessage } from './chat/ChatMessage';
+import { ChatInput } from './chat/ChatInput';
 
 interface Message {
     id: number;
@@ -66,22 +69,21 @@ export default function ChatWidget() {
         if (data) setMessages(data);
     };
 
-    const handleSendMessage = async () => {
-        if (!newMessage.trim() || !role) return;
+    const handleSendMessage = async (textToSend: string) => {
+        if (!textToSend.trim() || !role) return;
 
         const { error } = await supabase.from('chat_messages').insert([{
             sender_role: role,
-            content: newMessage
+            content: textToSend
         }]);
 
         if (error) console.error(error);
         else {
-            setNewMessage('');
             // Trigger Notification if sender is Porteiro (Notify Admins)
             if (role === 'porteiro') {
                 await fetch('/api/notifications/chat-broadcast', {
                     method: 'POST',
-                    body: JSON.stringify({ message: newMessage })
+                    body: JSON.stringify({ message: textToSend })
                 });
             }
         }
@@ -109,48 +111,33 @@ export default function ChatWidget() {
             )}
 
             {isOpen && (
-                <Card className="w-80 h-96 shadow-2xl flex flex-col animate-in slide-in-from-bottom-10">
-                    <CardHeader className="p-3 bg-blue-600 text-white flex flex-row items-center justify-between rounded-t-lg">
-                        <CardTitle className="text-sm font-bold flex items-center gap-2">
-                            <MessageCircle size={18} /> Chat Portaria &lt;-&gt; ADM
-                        </CardTitle>
-                        <button onClick={() => setIsOpen(false)} className="text-white hover:text-gray-200">
-                            <X size={18} />
-                        </button>
-                    </CardHeader>
-                    <CardContent className="flex-1 p-3 flex flex-col gap-2 overflow-hidden bg-white">
-                        <div className="flex-1 overflow-y-auto space-y-2 pr-1">
-                            {messages.map((msg) => {
+                <Card className="w-80 sm:w-80 h-[450px] shadow-2xl flex flex-col animate-in slide-in-from-bottom-5 border-none rounded-[12px] bg-[#e5ddd5]">
+                    {/* Header */}
+                    <ChatHeader onClose={() => setIsOpen(false)} />
+
+                    {/* Messages Area */}
+                    <CardContent className="flex-1 p-0 flex flex-col overflow-hidden relative">
+                        {/* Chat Background Pattern (Optional aesthetic touch) */}
+                        <div className="absolute inset-0 opacity-5 pointer-events-none" style={{ backgroundImage: 'radial-gradient(circle at center, #000 1px, transparent 1px)', backgroundSize: '10px 10px' }} />
+
+                        <div className="flex-1 overflow-y-auto px-3 py-4 space-y-1 relative z-10 w-full scrollbar-thin scrollbar-thumb-gray-300">
+                            {messages.map((msg, index) => {
                                 const isMe = msg.sender_role === role;
+                                const showDate = index === 0 ||
+                                    new Date(msg.created_at).toDateString() !== new Date(messages[index - 1].created_at).toDateString();
+
                                 return (
-                                    <div key={msg.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
-                                        <div className={`max-w-[80%] p-2 rounded-lg text-xs ${isMe
-                                            ? 'bg-blue-100 text-blue-900 rounded-tr-none'
-                                            : 'bg-gray-100 text-gray-900 rounded-tl-none'
-                                            }`}>
-                                            <p className="font-bold text-[10px] opacity-70 mb-1">
-                                                {msg.sender_role === 'admin' ? 'Administração' : 'Portaria'}
-                                            </p>
-                                            {msg.content}
-                                        </div>
+                                    <div key={msg.id} className="w-full flex flex-col">
+                                        {showDate && <ChatDateSeparator dateString={msg.created_at} />}
+                                        <ChatMessage message={msg} isMe={isMe} />
                                     </div>
                                 );
                             })}
-                            <div ref={scrollRef} />
+                            <div ref={scrollRef} className="h-1" />
                         </div>
 
-                        <div className="flex gap-2 pt-2 border-t">
-                            <Input
-                                className="h-9 text-xs"
-                                placeholder="Digite sua mensagem..."
-                                value={newMessage}
-                                onChange={(e) => setNewMessage(e.target.value)}
-                                onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
-                            />
-                            <Button size="icon" className="h-9 w-9 bg-blue-600" onClick={handleSendMessage}>
-                                <Send size={16} />
-                            </Button>
-                        </div>
+                        {/* Input Area */}
+                        <ChatInput onSend={handleSendMessage} />
                     </CardContent>
                 </Card>
             )}

@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { UserCog, Camera, Trash2, Users } from 'lucide-react';
 import { DetailsModal } from '@/components/DetailsModal';
+import { CameraAutoCapture } from '@/components/CameraAutoCapture';
 
 export default function Visitas() {
     const { registrarVisita, getVisitas, removerVisita, getVisitasAgendadas, concluirAgendamento } = useStorage();
@@ -88,13 +89,14 @@ export default function Visitas() {
                             <Input placeholder="Bloco" value={bloco} onChange={e => setBloco(e.target.value.toUpperCase())} className="bg-white text-black" />
                         </div>
 
-                        <div
-                            className="border-2 border-dashed border-gold/50 rounded-lg p-6 flex flex-col items-center justify-center cursor-pointer hover:bg-navy/50 transition-colors relative"
-                        >
-                            <input type="file" accept="image/*" capture="user" className="absolute inset-0 opacity-0 cursor-pointer" onChange={e => e.target.files && setFotoFile(e.target.files[0])} />
-                            <Camera size={32} className="text-gold mb-2" />
-                            <p className="text-gray-400 text-sm">{fotoFile ? "Foto Capturada" : "Foto Visitante (Opcional)"}</p>
-                        </div>
+                        <CameraAutoCapture onCapture={file => setFotoFile(file)} accept="image/*" capture="user">
+                            <div
+                                className="border-2 border-dashed border-gold/50 rounded-lg p-6 flex flex-col items-center justify-center cursor-pointer hover:bg-navy/50 transition-colors relative"
+                            >
+                                <Camera size={32} className="text-gold mb-2" />
+                                <p className="text-gray-400 text-sm">{fotoFile ? "Foto Capturada" : "Foto Visitante (Opcional)"}</p>
+                            </div>
+                        </CameraAutoCapture>
 
                         <Button className="w-full bg-success text-white font-bold h-12" onClick={handleSalvar} disabled={loading}>
                             {loading ? "REGISTRANDO..." : "REGISTRAR ENTRADA"}

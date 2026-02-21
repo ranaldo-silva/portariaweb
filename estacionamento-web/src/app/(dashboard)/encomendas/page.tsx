@@ -8,8 +8,8 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge'; // Wait, I didn't create Badge, I'll inline styles
 import { Search, Camera, Send, Package, Check, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-
 import { DetailsModal } from '@/components/DetailsModal';
+import { CameraAutoCapture } from '@/components/CameraAutoCapture';
 
 export default function Encomendas() {
     const { getMoradoresBase, registrarEncomenda, getEncomendasAtivas, validarTokenRetirada, removerEncomenda } = useStorage();
@@ -179,32 +179,23 @@ export default function Encomendas() {
                     </div>
 
                     {/* Foto */}
-                    <div
-                        className="border-2 border-dashed border-gold/50 rounded-lg p-6 flex flex-col items-center justify-center cursor-pointer hover:bg-navy/50 transition-colors"
-                        onClick={() => fileInputRef.current?.click()}
-                    >
-                        <input
-                            type="file"
-                            accept="image/*"
-                            capture="environment"
-                            className="hidden"
-                            ref={fileInputRef}
-                            onChange={handleFileChange}
-                        />
-                        {fotoFile ? (
-                            <div className="text-center">
-                                <p className="text-gold font-bold">{fotoFile.name}</p>
-                                <p className="text-xs text-gray-400">Clique para alterar</p>
-                            </div>
-                        ) : (
-                            <>
-                                <Camera size={32} className="text-gold mb-2" />
-                                <p className="text-gray-400 text-sm">Tirar foto da etiqueta</p>
-                            </>
-                        )}
-                    </div>
-
-
+                    <CameraAutoCapture onCapture={file => setFotoFile(file)} accept="image/*" capture="environment">
+                        <div
+                            className="border-2 border-dashed border-gold/50 rounded-lg p-6 flex flex-col items-center justify-center cursor-pointer hover:bg-navy/50 transition-colors"
+                        >
+                            {fotoFile ? (
+                                <div className="text-center">
+                                    <p className="text-gold font-bold">{fotoFile.name}</p>
+                                    <p className="text-xs text-gray-400">Clique para alterar</p>
+                                </div>
+                            ) : (
+                                <>
+                                    <Camera size={32} className="text-gold mb-2" />
+                                    <p className="text-gray-400 text-sm">Tirar foto da etiqueta</p>
+                                </>
+                            )}
+                        </div>
+                    </CameraAutoCapture>
 
                     <div className="flex items-center gap-2 px-1">
                         <input

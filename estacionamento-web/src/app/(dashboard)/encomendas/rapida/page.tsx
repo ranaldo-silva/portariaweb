@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Input } from '@/components/ui/input';
 import { Camera, Save, Search, Package, Check, Clock } from 'lucide-react';
 import { DetailsModal } from '@/components/DetailsModal';
+import { CameraAutoCapture } from '@/components/CameraAutoCapture';
 
 export default function EncomendasRapida() {
     const { registrarEncomendaIncompleta, getEncomendasIncompletas, resolverEncomendaIncompleta, getMoradoresBase } = useStorage();
@@ -107,23 +108,23 @@ export default function EncomendasRapida() {
                         <CardDescription>Registre encomendas sem dados completos para processar depois.</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                        <div
-                            className="border-2 border-dashed border-gold/30 rounded-lg p-8 flex flex-col items-center justify-center cursor-pointer hover:bg-navy/50 transition-colors bg-black/20"
-                            onClick={() => fileInputRef.current?.click()}
-                        >
-                            <input type="file" accept="image/*" capture="environment" className="hidden" ref={fileInputRef} onChange={handleFileChange} />
-                            {fotoFile ? (
-                                <div className="text-center">
-                                    <p className="text-gold font-bold">{fotoFile.name}</p>
-                                    <p className="text-xs text-gray-400">Clique para alterar</p>
-                                </div>
-                            ) : (
-                                <>
-                                    <Camera size={40} className="text-gold mb-2" />
-                                    <p className="text-gray-400">Tirar Foto (Opcional)</p>
-                                </>
-                            )}
-                        </div>
+                        <CameraAutoCapture onCapture={file => setFotoFile(file)} accept="image/*" capture="environment">
+                            <div
+                                className="border-2 border-dashed border-gold/30 rounded-lg p-8 flex flex-col items-center justify-center cursor-pointer hover:bg-navy/50 transition-colors bg-black/20"
+                            >
+                                {fotoFile ? (
+                                    <div className="text-center">
+                                        <p className="text-gold font-bold">{fotoFile.name}</p>
+                                        <p className="text-xs text-gray-400">Clique para alterar</p>
+                                    </div>
+                                ) : (
+                                    <>
+                                        <Camera size={40} className="text-gold mb-2" />
+                                        <p className="text-gray-400">Tirar Foto (Opcional)</p>
+                                    </>
+                                )}
+                            </div>
+                        </CameraAutoCapture>
 
                         <Input
                             placeholder="Descrição rápida (ex: Caixa Amazon rasgada)"

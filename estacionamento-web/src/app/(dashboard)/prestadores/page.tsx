@@ -9,6 +9,7 @@ import { Search, HardHat, Camera } from 'lucide-react';
 
 import { Trash2 } from 'lucide-react';
 import { DetailsModal } from '@/components/DetailsModal';
+import { CameraAutoCapture } from '@/components/CameraAutoCapture';
 
 export default function Prestadores() {
     const { salvarPrestador, getPrestadores, removerPrestador } = useStorage();
@@ -85,16 +86,18 @@ export default function Prestadores() {
                     <Input placeholder="Telefone" value={telefone} onChange={e => setTelefone(e.target.value)} className="bg-white text-black" />
 
                     <div className="grid grid-cols-2 gap-4">
-                        <div className="border border-dashed border-gold/50 rounded p-4 text-center cursor-pointer hover:bg-navy/50 relative">
-                            <input type="file" accept="image/*" capture="user" className="absolute inset-0 opacity-0 cursor-pointer" onChange={e => e.target.files && setFotoFile(e.target.files[0])} />
-                            <Camera className="mx-auto text-gold mb-2" />
-                            <p className="text-xs text-gray-400">{fotoFile ? "Foto selecionada" : "Foto Rosto"}</p>
-                        </div>
-                        <div className="border border-dashed border-gold/50 rounded p-4 text-center cursor-pointer hover:bg-navy/50 relative">
-                            <input type="file" accept="image/*" capture="environment" className="absolute inset-0 opacity-0 cursor-pointer" onChange={e => e.target.files && setDocFile(e.target.files[0])} />
-                            <Camera className="mx-auto text-gold mb-2" />
-                            <p className="text-xs text-gray-400">{docFile ? "Doc selecionado" : "Foto Doc"}</p>
-                        </div>
+                        <CameraAutoCapture onCapture={file => setFotoFile(file)} accept="image/*" capture="user">
+                            <div className="border border-dashed border-gold/50 rounded p-4 text-center cursor-pointer hover:bg-navy/50 relative">
+                                <Camera className="mx-auto text-gold mb-2" />
+                                <p className="text-xs text-gray-400">{fotoFile ? "Foto selecionada" : "Foto Rosto"}</p>
+                            </div>
+                        </CameraAutoCapture>
+                        <CameraAutoCapture onCapture={file => setDocFile(file)} accept="image/*" capture="environment">
+                            <div className="border border-dashed border-gold/50 rounded p-4 text-center cursor-pointer hover:bg-navy/50 relative">
+                                <Camera className="mx-auto text-gold mb-2" />
+                                <p className="text-xs text-gray-400">{docFile ? "Doc selecionado" : "Foto Doc"}</p>
+                            </div>
+                        </CameraAutoCapture>
                     </div>
 
                     <Button className="w-full bg-gold text-navy font-bold" onClick={handleSalvar} disabled={loading}>

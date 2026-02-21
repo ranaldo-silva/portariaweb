@@ -7,7 +7,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 // Textarea import removed to fix build error
-import { ArrowLeft, CheckCircle, AlertTriangle, MessageCircle, Phone } from 'lucide-react';
+import { ArrowLeft, CheckCircle, AlertTriangle, MessageCircle, Phone, FilePlus } from 'lucide-react';
+import { VehicleManualForm } from '@/components/VehicleManualForm';
 
 function NovoVeiculoContent() {
     const router = useRouter();
@@ -27,6 +28,7 @@ function NovoVeiculoContent() {
         whatsapp: ''
     });
 
+    const [isManualModalOpen, setIsManualModalOpen] = useState(false);
     const [moradores, setMoradores] = useState<any[]>([]);
 
     useEffect(() => {
@@ -146,9 +148,19 @@ function NovoVeiculoContent() {
                             <span className="text-green-500 font-bold">Morador Identificado</span>
                         </div>
                     ) : (
-                        <div className="flex items-center gap-2 p-3 bg-red-900/20 border border-red-500/50 rounded">
-                            <AlertTriangle className="text-red-500" />
-                            <span className="text-red-500 text-sm">Digite a placa para buscar</span>
+                        <div className="flex flex-col gap-3">
+                            <div className="flex items-center gap-2 p-3 bg-red-900/20 border border-red-500/50 rounded">
+                                <AlertTriangle className="text-red-500" />
+                                <span className="text-red-500 text-sm">Digite a placa para buscar</span>
+                            </div>
+                            <Button
+                                variant="outline"
+                                className="w-full border-gold text-gold hover:bg-gold/10 hover:text-gold"
+                                onClick={() => setIsManualModalOpen(true)}
+                            >
+                                <FilePlus size={18} className="mr-2" />
+                                Alocar veículo sem cadastro
+                            </Button>
                         </div>
                     )}
 
@@ -204,6 +216,19 @@ function NovoVeiculoContent() {
 
                 </CardContent>
             </Card>
+
+            {isManualModalOpen && (
+                <VehicleManualForm
+                    vagaConfig={form.vaga}
+                    onClose={() => setIsManualModalOpen(false)}
+                    onSuccess={(payload) => {
+                        setIsManualModalOpen(false);
+                        // The form component already saves the vehicle to the db via useStorage hooks,
+                        // so we just return to the dashboard because it's done.
+                        router.push('/dashboard');
+                    }}
+                />
+            )}
         </div>
     );
 }

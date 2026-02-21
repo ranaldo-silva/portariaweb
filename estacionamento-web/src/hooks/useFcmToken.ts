@@ -70,12 +70,12 @@ export const useFcmToken = () => {
                                 console.warn("No session ID or admin email found in localStorage. Token not saved.");
                             }
                         } else {
-                            console.log('No registration token available.');
+                            // No registration token
                         }
                     }
                 }
             } catch (error) {
-                console.log('An error occurred while retrieving token:', error);
+                console.error('An error occurred while retrieving token:', error);
             }
         };
 

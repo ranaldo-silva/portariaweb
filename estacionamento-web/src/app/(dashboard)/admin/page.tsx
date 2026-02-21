@@ -57,7 +57,7 @@ export default function Admin() {
     const loadSolicitacoes = async () => {
         const { data } = await supabase
             .from('solicitacoes')
-            .select(`*, moradores(nome_responsavel, apartamento, bloco)`)
+            .select(`*, moradores(*)`)
             .eq('status', 'pendente')
             .order('data_solicitacao', { ascending: false });
         setSolicitacoes(data || []);
@@ -72,8 +72,13 @@ export default function Admin() {
             let updatePayload: any = {};
 
             if (sol.tipo === 'veiculo') {
-                const infoVeiculo = `${dados.modelo}, ${dados.placa}, ${dados.cor}`.toUpperCase();
+                const modelo = dados.modelo || '';
+                const placa = dados.placa || '';
+                const cor = dados.cor || '';
+                const infoVeiculo = `${modelo} | ${placa} | ${cor}`.toUpperCase(); // Changed to pipe for better parsing later if needed
+
                 // Check local state or payload for vehicle type
+                // Default to Carro if not specified, unless it's explicitly Moto
                 if (dados.tipo_veiculo === 'Moto') {
                     updatePayload.moto_detalhes = infoVeiculo;
                 } else {
@@ -81,10 +86,15 @@ export default function Admin() {
                 }
             }
             else if (sol.tipo === 'dependente') {
-                updatePayload.lista_moradores = dados.dependentes.toUpperCase();
+                updatePayload.lista_moradores = (dados.dependentes || "").toUpperCase();
             }
             else if (sol.tipo === 'contato') {
-                updatePayload.whatsapp = dados.whatsapp.replace(/\D/g, "");
+                updatePayload.whatsapp = (dados.whatsapp || "").replace(/\D/g, "");
+            }
+            else if (sol.tipo === 'atualizacao_cadastral') {
+                if (dados.carro !== undefined) updatePayload.carro_detalhes = formatarVeiculoBase(dados.carro);
+                if (dados.moto !== undefined) updatePayload.moto_detalhes = formatarVeiculoBase(dados.moto);
+                if (dados.dependentes !== undefined) updatePayload.lista_moradores = formatarNomeProprio(dados.dependentes);
             }
             else if (sol.tipo === 'novo_cadastro') {
                 // Insert new resident
@@ -224,6 +234,7 @@ export default function Admin() {
                                         {sol.tipo === 'veiculo' && <>Solicita: <strong>{sol.dados_novos.modelo} - {sol.dados_novos.placa}</strong></>}
                                         {sol.tipo === 'dependente' && <>Nova lista: <strong>{sol.dados_novos.dependentes}</strong></>}
                                         {sol.tipo === 'contato' && <>WhatsApp: <strong>{sol.dados_novos.whatsapp}</strong></>}
+                                        {sol.tipo === 'atualizacao_cadastral' && <>Atualização de dados cadastrais (clique em Ver Detalhes)</>}
                                         {sol.tipo === 'novo_cadastro' && (
                                             <Button variant="ghost" className="text-blue-400 p-0 h-auto ml-2 hover:bg-transparent underline" onClick={() => {
                                                 const dados = sol.dados_novos;
@@ -246,21 +257,35 @@ export default function Admin() {
                                 <div className="flex gap-2 w-full md:w-auto">
                                     <Button variant="ghost" className="text-blue-400 p-0 h-auto hover:bg-transparent underline mr-2" onClick={() => {
                                         const dados = sol.dados_novos;
-                                        let details: any = { ...dados };
+                                        // Merge current resident data with the new data for a complete view
+                                        const moradorAtual = sol.moradores || {};
+                                        let details: any = { ...moradorAtual };
 
-                                        // Normalize data for Modal
+                                        // Overlay new data based on type
                                         if (sol.tipo === 'veiculo') {
                                             details = {
                                                 ...details,
-                                                tipo_veiculo: dados.tipo_veiculo || 'Carro',
-                                                modelo: dados.modelo,
+                                                veiculo_novo_tipo: dados.tipo_veiculo || 'Carro',
+                                                veiculo_novo_modelo: dados.modelo,
+                                                veiculo_novo_placa: dados.placa,
+                                                veiculo_novo_cor: dados.cor,
+                                                // Preview how it would look - mostly for the specific fields
+                                                modelo: dados.modelo, // For modal display
                                                 placa: dados.placa,
-                                                cor: dados.cor
+                                                cor: dados.cor,
+                                                tipo_veiculo: dados.tipo_veiculo
                                             };
                                         } else if (sol.tipo === 'dependente') {
-                                            details = { lista_moradores: dados.dependentes };
+                                            details = { ...details, lista_moradores: dados.dependentes };
                                         } else if (sol.tipo === 'contato') {
-                                            details = { whatsapp: dados.whatsapp };
+                                            details = { ...details, whatsapp: dados.whatsapp };
+                                        } else if (sol.tipo === 'atualizacao_cadastral') {
+                                            details = {
+                                                ...details,
+                                                lista_moradores: dados.dependentes || details.lista_moradores,
+                                                carro_detalhes: dados.carro || details.carro_detalhes,
+                                                moto_detalhes: dados.moto || details.moto_detalhes
+                                            };
                                         }
 
                                         setSelectedItem(details);
