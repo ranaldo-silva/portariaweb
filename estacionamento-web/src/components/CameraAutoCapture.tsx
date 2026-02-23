@@ -17,15 +17,21 @@ export function CameraAutoCapture({ onCapture, children, fallbackInputName, acce
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
-    // Clean up when unmounting
+    // Clean up preview URL when it changes
     useEffect(() => {
         return () => {
-            stopCamera();
             if (previewUrl) {
                 URL.revokeObjectURL(previewUrl);
             }
         };
-    }, [stopCamera, previewUrl]);
+    }, [previewUrl]);
+
+    // Clean up camera only when unmounting
+    useEffect(() => {
+        return () => {
+            stopCamera();
+        };
+    }, [stopCamera]);
 
     const handleTriggerClick = async () => {
         // Try to open camera first

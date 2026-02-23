@@ -1,7 +1,8 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 
 export function useWebcamCapture() {
     const [stream, setStream] = useState<MediaStream | null>(null);
+    const streamRef = useRef<MediaStream | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [isCapturing, setIsCapturing] = useState(false);
     const videoRef = useRef<HTMLVideoElement>(null);
@@ -13,9 +14,11 @@ export function useWebcamCapture() {
             const mediaStream = await navigator.mediaDevices.getUserMedia({
                 video: { facingMode: 'environment' }
             });
+            streamRef.current = mediaStream;
             setStream(mediaStream);
             if (videoRef.current) {
                 videoRef.current.srcObject = mediaStream;
+                videoRef.current.play().catch((e) => console.warn("Autoplay prevented:", e));
             }
         } catch (err: any) {
             setError(err.message || 'Não foi possível acessar a câmera');
@@ -24,19 +27,20 @@ export function useWebcamCapture() {
     }, []);
 
     const stopCamera = useCallback(() => {
-        if (stream) {
-            stream.getTracks().forEach(track => track.stop());
-            setStream(null);
-            if (videoRef.current) {
-                videoRef.current.srcObject = null;
-            }
+        if (streamRef.current) {
+            streamRef.current.getTracks().forEach(track => track.stop());
+            streamRef.current = null;
+        }
+        setStream(null);
+        if (videoRef.current) {
+            videoRef.current.srcObject = null;
         }
         setIsCapturing(false);
-    }, [stream]);
+    }, []);
 
     const capturePhoto = useCallback((): Promise<File | null> => {
         return new Promise((resolve) => {
-            if (!videoRef.current || !stream) {
+            if (!videoRef.current || !streamRef.current) {
                 resolve(null);
                 return;
             }
@@ -63,7 +67,26 @@ export function useWebcamCapture() {
                 }
             }, 'image/jpeg', 0.8);
         });
-    }, [stream]);
+    }, []);
+
+    // Ensure video stream is attached when the video element mounts
+    useEffect(() => {
+        if (isCapturing && videoRef.current && streamRef.current) {
+            if (videoRef.current.srcObject !== streamRef.current) {
+                videoRef.current.srcObject = streamRef.current;
+                videoRef.current.play().catch((e) => console.warn("Autoplay prevented:", e));
+            }
+        }
+    }, [isCapturing, stream]); // react re-renders when `stream` or `isCapturing` changes, attaching the effect
+
+    // Cleanup on unmount
+    useEffect(() => {
+        return () => {
+            if (streamRef.current) {
+                streamRef.current.getTracks().forEach(track => track.stop());
+            }
+        };
+    }, []);
 
     return {
         videoRef,
