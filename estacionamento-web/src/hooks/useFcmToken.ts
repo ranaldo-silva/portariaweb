@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { getToken, onMessage } from 'firebase/messaging';
-import { messaging } from '@/lib/firebase';
+import { getToken, onMessage, isSupported, getMessaging } from 'firebase/messaging';
+import { app } from '@/lib/firebase';
 import { supabase } from '@/lib/supabase';
 
 // VAPID key from environment variable
@@ -18,10 +18,13 @@ export const useFcmToken = () => {
                     setNotificationPermissionStatus(permission);
 
                     if (permission === 'granted') {
-                        if (!messaging) {
-                            console.error("Firebase messaging not initialized.");
+                        const supported = await isSupported();
+                        if (!supported) {
+                            console.warn("O navegador não suporta Firebase Messaging.");
                             return;
                         }
+
+                        const messaging = getMessaging(app);
 
                         const currentToken = await getToken(messaging, {
                             vapidKey: VAPID_KEY,
@@ -84,26 +87,29 @@ export const useFcmToken = () => {
 
     // Listen for foreground messages
     useEffect(() => {
-        if (typeof window !== 'undefined' && 'serviceWorker' in navigator && messaging) {
-            const unsubscribe = onMessage(messaging, (payload) => {
-                console.log('Foreground Message received:', payload);
-                const { title, body } = payload.notification || {};
+        let unsubscribe: any = null;
+        if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+            isSupported().then((supported) => {
+                if (supported) {
+                    const messaging = getMessaging(app);
+                    unsubscribe = onMessage(messaging, (payload) => {
+                        console.log('Foreground Message received:', payload);
+                        const { title, body } = payload.notification || {};
 
-                // Show a simple browser alert or custom toast
-                // Using alert for immediate visibility in testing, can swap for toast later
-                if (title) {
-                    // Start vibrate pattern for mobile
-                    if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+                        if (title) {
+                            // Start vibrate pattern for mobile
+                            if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
 
-                    // Option: Create a visible HTML element or use alert
-                    // alert(`🔔 ${title}\n${body}`); 
-
-                    // Better Option: Browser Notification API even if in foreground (if supported)
-                    new Notification(title, { body, icon: '/vercel.svg' });
+                            // Better Option: Browser Notification API even if in foreground (if supported)
+                            new Notification(title, { body, icon: '/vercel.svg' });
+                        }
+                    });
                 }
             });
-            return () => unsubscribe();
         }
+        return () => {
+            if (unsubscribe) unsubscribe();
+        };
     }, []);
 
     return { fcmToken: token, notificationPermissionStatus };

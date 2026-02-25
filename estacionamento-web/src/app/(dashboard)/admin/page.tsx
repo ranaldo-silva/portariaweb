@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { generateReportHTML, printHTML } from '@/lib/print';
 import { formatarNomeProprio, formatarVeiculoBase } from '@/lib/utils';
-import { FileText, Trash2, Car, Package, Users, Search, Edit, UserCog } from 'lucide-react';
+import { FileText, Trash2, Car, Package, Users, Search, Edit, UserCog, Clock, Bike, PartyPopper } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { DetailsModal } from '@/components/DetailsModal';
 
@@ -15,15 +15,20 @@ export default function Admin() {
     const {
         getVeiculos, getHistorico, getTodasEncomendas, limparHistorico, limparAtivos,
         getMoradoresBase, salvarMoradorBase, removerMoradorBase,
-        atualizarEncomenda, removerEncomenda, getVisitas
+        atualizarEncomenda, removerEncomenda, getVisitas,
+        getTodasEncomendasIncompletas, getHistoricoMotos,
+        getEventosSalao
     } = useStorage();
 
-    const [activeTab, setActiveTab] = useState<'dashboard' | 'moradores' | 'encomendas' | 'visitas'>('dashboard');
+    const [activeTab, setActiveTab] = useState<'dashboard' | 'moradores' | 'encomendas' | 'incompletas' | 'motos' | 'visitas' | 'salao'>('dashboard');
 
     // Data States
     const [veiculos, setVeiculos] = useState<any[]>([]);
     const [historico, setHistorico] = useState<any[]>([]);
     const [encomendas, setEncomendas] = useState<any[]>([]);
+    const [incompletas, setIncompletas] = useState<any[]>([]);
+    const [motos, setMotos] = useState<any[]>([]);
+    const [eventosSalao, setEventosSalao] = useState<any[]>([]);
     const [moradores, setMoradores] = useState<any[]>([]);
     const [visitasList, setVisitasList] = useState<any[]>([]);
     const [solicitacoes, setSolicitacoes] = useState<any[]>([]);
@@ -31,6 +36,9 @@ export default function Admin() {
     // UI States
     const [buscaMorador, setBuscaMorador] = useState('');
     const [buscaEncomenda, setBuscaEncomenda] = useState('');
+    const [buscaIncompleta, setBuscaIncompleta] = useState('');
+    const [buscaMoto, setBuscaMoto] = useState('');
+    const [buscaSalao, setBuscaSalao] = useState('');
     const [selectedItem, setSelectedItem] = useState<any>(null);
     const [modalType, setModalType] = useState<any>('morador');
 
@@ -39,16 +47,22 @@ export default function Admin() {
     }, []);
 
     const loadData = async () => {
-        const [v, h, e, m, vis] = await Promise.all([
+        const [v, h, e, inc, mot, sal, m, vis] = await Promise.all([
             getVeiculos(),
             getHistorico(),
             getTodasEncomendas(),
+            getTodasEncomendasIncompletas(),
+            getHistoricoMotos(),
+            getEventosSalao(),
             getMoradoresBase(),
             getVisitas()
         ]);
         setVeiculos(v || []);
         setHistorico(h || []);
         setEncomendas(e || []);
+        setIncompletas(inc || []);
+        setMotos(mot || []);
+        setEventosSalao(sal || []);
         setMoradores(m || []);
         setVisitasList(vis || []);
         loadSolicitacoes();
@@ -191,6 +205,9 @@ export default function Admin() {
                 { id: 'dashboard', label: 'Dashboard & Aprovações', icon: <FileText size={18} /> },
                 { id: 'moradores', label: 'Gerenciar Moradores', icon: <Users size={18} /> },
                 { id: 'encomendas', label: 'Gerenciar Encomendas', icon: <Package size={18} /> },
+                { id: 'incompletas', label: 'Encomendas S/ Compl.', icon: <Clock size={18} /> },
+                { id: 'motos', label: 'Controle Motos', icon: <Bike size={18} /> },
+                { id: 'salao', label: 'Salões de Festas', icon: <PartyPopper size={18} /> },
                 { id: 'visitas', label: 'Histórico de Visitas', icon: <UserCog size={18} /> },
             ].map(tab => (
                 <button
@@ -539,6 +556,165 @@ export default function Admin() {
         </div>
     );
 
+    const renderIncompletas = () => (
+        <div className="space-y-4 animate-in fade-in">
+            <div className="flex gap-2">
+                <div className="relative flex-1">
+                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
+                    <Input
+                        placeholder="Buscar por Descrição ou Status..."
+                        value={buscaIncompleta}
+                        onChange={e => setBuscaIncompleta(e.target.value)}
+                        className="pl-9 bg-white text-black"
+                    />
+                </div>
+                <Button onClick={loadData}>Atualizar</Button>
+            </div>
+
+            <div className="bg-white rounded-lg overflow-x-auto shadow">
+                <table className="w-full text-sm text-left text-gray-800">
+                    <thead className="bg-gray-100 text-gray-700">
+                        <tr>
+                            <th className="p-3">Data/Hora</th>
+                            <th className="p-3">Descrição/Cód</th>
+                            <th className="p-3">Status</th>
+                            <th className="p-3">Registrado Por</th>
+                            <th className="p-3 text-right">Ação</th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200">
+                        {incompletas.filter(e =>
+                            e.descricao?.toLowerCase().includes(buscaIncompleta.toLowerCase()) ||
+                            e.status?.toLowerCase().includes(buscaIncompleta.toLowerCase())
+                        ).slice(0, 50).map(e => (
+                            <tr key={e.id} className="hover:bg-gray-50">
+                                <td className="p-3 text-xs text-gray-500">{new Date(e.data_chegada).toLocaleString()}</td>
+                                <td className="p-3 font-bold">{e.descricao}</td>
+                                <td className="p-3">
+                                    <span className={`px-2 py-1 rounded-full text-xs font-bold ${e.status === 'pendente' ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800'}`}>
+                                        {e.status}
+                                    </span>
+                                </td>
+                                <td className="p-3">{e.registrado_por}</td>
+                                <td className="p-3 text-right">
+                                    <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={() => { setSelectedItem(e); setModalType('incompleta'); }}>
+                                        <Edit className="h-4 w-4 text-blue-600" />
+                                    </Button>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    );
+
+    const renderMotos = () => (
+        <div className="space-y-4 animate-in fade-in">
+            <div className="flex gap-2">
+                <div className="relative flex-1">
+                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
+                    <Input
+                        placeholder="Buscar por Morador, AP ou Moto..."
+                        value={buscaMoto}
+                        onChange={e => setBuscaMoto(e.target.value)}
+                        className="pl-9 bg-white text-black"
+                    />
+                </div>
+                <Button onClick={loadData}>Atualizar</Button>
+            </div>
+
+            <div className="bg-white rounded-lg overflow-x-auto shadow">
+                <table className="w-full text-sm text-left text-gray-800">
+                    <thead className="bg-gray-100 text-gray-700">
+                        <tr>
+                            <th className="p-3">Data/Hora</th>
+                            <th className="p-3">Morador</th>
+                            <th className="p-3">Unidade</th>
+                            <th className="p-3">Moto/Placa</th>
+                            <th className="p-3 text-right">Ação</th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200">
+                        {motos.filter(m =>
+                            m.morador_nome?.toLowerCase().includes(buscaMoto.toLowerCase()) ||
+                            m.moto_detalhes?.toLowerCase().includes(buscaMoto.toLowerCase()) ||
+                            String(m.apartamento).includes(buscaMoto)
+                        ).slice(0, 50).map(m => (
+                            <tr key={m.id} className="hover:bg-gray-50">
+                                <td className="p-3 text-xs text-gray-500">{new Date(m.data_entrada).toLocaleString()}</td>
+                                <td className="p-3 font-bold">{m.morador_nome}</td>
+                                <td className="p-3">AP {m.apartamento} {m.bloco}</td>
+                                <td className="p-3">{m.moto_detalhes}</td>
+                                <td className="p-3 text-right">
+                                    <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={() => { setSelectedItem(m); setModalType('moto'); }}>
+                                        <Edit className="h-4 w-4 text-blue-600" />
+                                    </Button>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    );
+
+    const renderSalao = () => (
+        <div className="space-y-4 animate-in fade-in">
+            <div className="flex gap-2">
+                <div className="relative flex-1">
+                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
+                    <Input
+                        placeholder="Buscar por Morador ou Bloco do Salão..."
+                        value={buscaSalao}
+                        onChange={e => setBuscaSalao(e.target.value)}
+                        className="pl-9 bg-white text-black"
+                    />
+                </div>
+                <Button onClick={loadData}>Atualizar</Button>
+            </div>
+
+            <div className="bg-white rounded-lg overflow-x-auto shadow">
+                <table className="w-full text-sm text-left text-gray-800">
+                    <thead className="bg-gray-100 text-gray-700">
+                        <tr>
+                            <th className="p-3">Data da Festa</th>
+                            <th className="p-3">Morador</th>
+                            <th className="p-3">Unidade</th>
+                            <th className="p-3">Salão Reservado</th>
+                            <th className="p-3">Status</th>
+                            <th className="p-3 text-right">Lista Convidados</th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200">
+                        {eventosSalao.filter(ev =>
+                            ev.morador?.nome_responsavel?.toLowerCase().includes(buscaSalao.toLowerCase()) ||
+                            ev.bloco_salao?.toLowerCase().includes(buscaSalao.toLowerCase()) ||
+                            String(ev.apartamento).includes(buscaSalao)
+                        ).map(ev => (
+                            <tr key={ev.id} className="hover:bg-gray-50">
+                                <td className="p-3 text-xs font-bold text-gray-600">{new Date(ev.data_evento + 'T12:00:00Z').toLocaleDateString()}</td>
+                                <td className="p-3 font-bold">{ev.morador?.nome_responsavel || ev.morador_nome || 'N/A'}</td>
+                                <td className="p-3">AP {ev.apartamento || ev.morador?.apartamento} {ev.bloco || ev.morador?.bloco}</td>
+                                <td className="p-3">
+                                    <span className="px-2 py-1 bg-pink-100 text-pink-800 rounded-full text-xs font-bold">
+                                        Bloco {ev.bloco_salao}
+                                    </span>
+                                </td>
+                                <td className="p-3">{ev.status}</td>
+                                <td className="p-3 text-right">
+                                    <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={() => { setSelectedItem(ev); setModalType('salao'); }}>
+                                        <Edit className="h-4 w-4 text-pink-600" />
+                                    </Button>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    );
+
     return (
         <div className="space-y-6">
             <h1 className="text-2xl font-bold text-gold">Painel Administrativo</h1>
@@ -548,17 +724,27 @@ export default function Admin() {
             {activeTab === 'dashboard' && renderDashboard()}
             {activeTab === 'moradores' && renderMoradores()}
             {activeTab === 'encomendas' && renderEncomendas()}
+            {activeTab === 'incompletas' && renderIncompletas()}
+            {activeTab === 'motos' && renderMotos()}
+            {activeTab === 'salao' && renderSalao()}
             {activeTab === 'visitas' && renderVisitas()}
 
             {selectedItem && (
                 <DetailsModal
                     isOpen={!!selectedItem}
                     onClose={() => setSelectedItem(null)}
-                    title={modalType === 'morador' ? "Detalhes do Morador" :
-                        modalType === 'detalhes_solicitacao' ? "Detalhes da Solicitação" : "Detalhes da Encomenda"}
+                    title={
+                        modalType === 'morador' ? "Detalhes do Morador" :
+                            modalType === 'detalhes_solicitacao' ? "Detalhes da Solicitação" :
+                                modalType === 'encomenda' ? "Detalhes da Encomenda" :
+                                    modalType === 'incompleta' ? "Detalhes Encomenda S/ Compl." :
+                                        modalType === 'moto' ? "Detalhes Registro Moto" :
+                                            modalType === 'salao' ? "Detalhes Salão de Festas" :
+                                                "Detalhes"
+                    }
                     data={selectedItem}
                     type={modalType === 'detalhes_solicitacao' ? 'morador' : modalType} // Reuse morador display for generic details
-                    readOnly={modalType === 'detalhes_solicitacao'}
+                    readOnly={modalType === 'detalhes_solicitacao' || modalType === 'incompleta' || modalType === 'moto' || modalType === 'salao'} // Read only for these log tables for now
                     onSave={modalType === 'morador' ? handleSaveMorador : (modalType === 'encomenda' ? handleSaveEncomenda : undefined)}
                     onDelete={modalType === 'morador' ? handleDeleteMorador : (modalType === 'encomenda' ? handleDeleteEncomenda : undefined)}
                 />

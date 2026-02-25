@@ -11,7 +11,7 @@ interface DetailsModalProps {
     onClose: () => void;
     title: string;
     data: any;
-    type?: 'morador' | 'encomenda' | 'visita' | 'prestador' | 'veiculo';
+    type?: 'morador' | 'encomenda' | 'visita' | 'prestador' | 'veiculo' | 'incompleta' | 'moto' | 'salao';
     onSave?: (updatedData: any) => Promise<void>;
     readOnly?: boolean;
     onDelete?: (id: string) => Promise<void>;
@@ -155,6 +155,59 @@ export function DetailsModal({ isOpen, onClose, title, data, type = 'morador', o
                                                 "{data.observacoes}"
                                             </div>
                                         )}
+                                    </div>
+                                </>
+                            )}
+                            {/* Incompleta Specific */}
+                            {type === 'incompleta' && (
+                                <>
+                                    <p><strong className="text-gold">Descrição / Cód:</strong> {data.descricao}</p>
+                                    <p><strong className="text-gold">Status:</strong> {data.status}</p>
+                                    <p><strong className="text-gold">Data/Hora:</strong> {new Date(data.data_chegada).toLocaleString('pt-BR')}</p>
+                                    <p><strong className="text-gold">Porteiro:</strong> {data.registrado_por}</p>
+                                    {data.foto_url && (
+                                        <div className="mt-4 flex flex-col items-center">
+                                            <strong className="text-gold block mb-2 w-full text-left">Foto da Encomenda:</strong>
+                                            <img src={data.foto_url} alt="Foto Encomenda" className="w-full max-h-80 object-contain rounded-lg border-2 border-gold shadow-lg bg-black cursor-zoom-in" onClick={() => window.open(data.foto_url, '_blank')} title="Clique para expandir" />
+                                        </div>
+                                    )}
+                                </>
+                            )}
+
+                            {/* Moto Specific */}
+                            {type === 'moto' && (
+                                <>
+                                    <p><strong className="text-gold">Morador:</strong> {data.morador_nome}</p>
+                                    <p><strong className="text-gold">Unidade:</strong> AP {data.apartamento} - {data.bloco}</p>
+                                    <p><strong className="text-gold">Moto Registrada:</strong> {data.moto_detalhes}</p>
+                                    <p><strong className="text-gold">Data de Entrada:</strong> {new Date(data.data_entrada).toLocaleString('pt-BR')}</p>
+                                    {data.foto_url && (
+                                        <div className="mt-4 flex flex-col items-center">
+                                            <strong className="text-gold block mb-2 w-full text-left">Foto de Captura:</strong>
+                                            <img src={data.foto_url} alt="Foto Moto" className="w-full max-h-80 object-contain rounded-lg border-2 border-gold shadow-lg bg-black cursor-zoom-in" onClick={() => window.open(data.foto_url, '_blank')} title="Clique para expandir" />
+                                        </div>
+                                    )}
+                                </>
+                            )}
+
+                            {/* Salao Specific */}
+                            {type === 'salao' && (
+                                <>
+                                    <div className="flex justify-between items-start mb-4 border-b border-gray-700 pb-3">
+                                        <div>
+                                            <p><strong className="text-gold">Morador:</strong> {data.morador_nome || data.morador?.nome_responsavel}</p>
+                                            <p><strong className="text-gold">Unidade:</strong> AP {data.apartamento || data.morador?.apartamento} - {data.bloco || data.morador?.bloco}</p>
+                                        </div>
+                                        <div className="text-right">
+                                            <p><strong className="text-gold flex items-center gap-1 justify-end">Bloco {data.bloco_salao}</strong></p>
+                                            <p className="text-sm">{new Date(data.data_evento + 'T12:00:00Z').toLocaleDateString()}</p>
+                                        </div>
+                                    </div>
+                                    <div className="mt-2">
+                                        <strong className="text-gold block mb-2 text-lg">Convidados Registrados:</strong>
+                                        <div className="bg-black/30 p-4 rounded-lg font-mono text-sm whitespace-pre-wrap max-h-[300px] overflow-y-auto border border-gray-700">
+                                            {data.lista_convidados}
+                                        </div>
                                     </div>
                                 </>
                             )}

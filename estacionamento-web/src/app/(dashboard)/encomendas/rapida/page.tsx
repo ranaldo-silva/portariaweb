@@ -5,7 +5,7 @@ import { useStorage } from '@/hooks/useStorage';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Camera, Save, Search, Package, Check, Clock } from 'lucide-react';
+import { Camera, Save, Search, Package, Check, Clock, X } from 'lucide-react';
 import { DetailsModal } from '@/components/DetailsModal';
 import { CameraAutoCapture } from '@/components/CameraAutoCapture';
 
@@ -15,6 +15,7 @@ export default function EncomendasRapida() {
     const [loading, setLoading] = useState(false);
     const [fotoFile, setFotoFile] = useState<File | null>(null);
     const [descricao, setDescricao] = useState('');
+    const [codigoRastreio, setCodigoRastreio] = useState('');
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     const [incompletas, setIncompletas] = useState<any[]>([]);
@@ -33,7 +34,10 @@ export default function EncomendasRapida() {
         setMoradores(mor || []);
     };
 
-    useEffect(() => { carregar(); }, []);
+    useEffect(() => {
+        setCodigoRastreio(Math.floor(1000 + Math.random() * 9000).toString());
+        carregar();
+    }, []);
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files[0]) setFotoFile(e.target.files[0]);
@@ -45,12 +49,16 @@ export default function EncomendasRapida() {
             return;
         }
         setLoading(true);
+        // Prepend the tracking code to the description seamlessly
+        const novaDescricao = `[CÓD: ${codigoRastreio}] ${descricao}`.trim();
+
         // Porteiro hardcoded or from auth? 'Portaria' for now as usually generic user
-        const ok = await registrarEncomendaIncompleta({ fotoFile: fotoFile || undefined, descricao, porteiro: 'Portaria' });
+        const ok = await registrarEncomendaIncompleta({ fotoFile: fotoFile || undefined, descricao: novaDescricao, porteiro: 'Portaria' });
         if (ok) {
-            alert("Salvo!");
+            alert(`✅ Salvo com sucesso!\n\n⚠️ ESCREVA O CÓDIGO [ ${codigoRastreio} ] NA ENCOMENDA.`);
             setFotoFile(null);
             setDescricao('');
+            setCodigoRastreio(Math.floor(1000 + Math.random() * 9000).toString());
             carregar();
         } else {
             alert("Erro ao salvar.");
@@ -102,10 +110,13 @@ export default function EncomendasRapida() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-6xl mx-auto pb-20">
             {/* LEFT: Quick Capture */}
             <div className="space-y-6">
-                <Card className="bg-navy-light border-gold/50">
-                    <CardHeader>
-                        <CardTitle className="text-gold flex items-center gap-2"><Clock /> Recebimento Rápido</CardTitle>
-                        <CardDescription>Registre encomendas sem dados completos para processar depois.</CardDescription>
+                <Card className="bg-navy-light border-gold/50 relative overflow-hidden">
+                    <div className="absolute top-0 right-0 bg-gold text-navy font-black text-2xl font-mono px-4 py-2 rounded-bl-xl shadow-lg border-b-2 border-l-2 border-gold-hover">
+                        {codigoRastreio}
+                    </div>
+                    <CardHeader className="pr-24">
+                        <CardTitle className="text-gold flex items-center gap-2"><Clock /> Encomendas</CardTitle>
+                        <CardDescription>Escreva o código <strong className="text-white bg-gray-800 px-1 rounded">{codigoRastreio}</strong> na embalagem e registre os dados e a foto.</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
                         <CameraAutoCapture onCapture={file => setFotoFile(file)} accept="image/*" capture="environment">
@@ -177,7 +188,15 @@ export default function EncomendasRapida() {
             {/* IDENTIFICATION MODAL (Custom implementation for speed) */}
             {identificando && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
-                    <Card className="w-full max-w-lg bg-white text-black animate-in fade-in zoom-in">
+                    <Card className="w-full max-w-lg bg-white text-black animate-in fade-in zoom-in relative">
+                        {/* Close Button X */}
+                        <button
+                            onClick={() => setIdentificando(null)}
+                            className="absolute right-4 top-4 text-gray-500 hover:text-black hover:bg-gray-100 p-1 rounded-full transition-colors"
+                        >
+                            <X size={20} />
+                        </button>
+
                         <CardHeader className="border-b">
                             <CardTitle>Identificar Encomenda</CardTitle>
                             <CardDescription>Vincule esta encomenda a um morador para dar baixa.</CardDescription>

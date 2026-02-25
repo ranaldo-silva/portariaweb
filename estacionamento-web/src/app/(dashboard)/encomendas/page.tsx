@@ -26,7 +26,7 @@ export default function Encomendas() {
     const [itemDetalhes, setItemDetalhes] = useState<any>(null); // Details state
     const [tokenDigitado, setTokenDigitado] = useState('');
     const [loading, setLoading] = useState(false);
-    const [notificarWhats, setNotificarWhats] = useState(true);
+    const [notificarWhats, setNotificarWhats] = useState(false);
 
     const origensComuns = ["Shopee", "Mercado Livre", "Shein", "Amazon", "Correios", "99Food", "KeeTa", "Transportadora"];
 

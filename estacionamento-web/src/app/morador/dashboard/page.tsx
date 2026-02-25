@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Package, Car, Users, Phone, Plus, LogOut, Clock } from "lucide-react";
+import { Package, Car, Users, Phone, LogOut, Clock, PartyPopper } from "lucide-react";
 import { ModeToggle } from "@/components/mode-toggle";
 
 export default function DashboardMorador() {
@@ -122,6 +122,19 @@ export default function DashboardMorador() {
                         <CardContent className="p-4 pt-0">
                             <p className="text-sm font-bold mt-1">Autorizar Entrada</p>
                             <p className="text-xs text-muted-foreground">Pré-liberar visitante</p>
+                        </CardContent>
+                    </Card>
+                </div>
+                <div onClick={() => router.push('/morador/salao-festas')} className="cursor-pointer transition-transform hover:scale-[1.01] col-span-2">
+                    <Card className="border-pink-500/30 shadow-md bg-card text-card-foreground h-full">
+                        <CardContent className="p-4 flex items-center justify-between">
+                            <div>
+                                <h3 className="flex items-center gap-2 font-bold text-pink-600 dark:text-pink-400">
+                                    <PartyPopper size={18} /> Salão de Festas
+                                </h3>
+                                <p className="text-xs text-muted-foreground mt-1">Envie sua lista de convidados</p>
+                            </div>
+                            <Button size="sm" variant="outline" className="h-8 text-xs border-pink-200 text-pink-700 hover:bg-pink-50 dark:hover:bg-pink-900/30 dark:border-pink-800 dark:text-pink-300">Acessar</Button>
                         </CardContent>
                     </Card>
                 </div>

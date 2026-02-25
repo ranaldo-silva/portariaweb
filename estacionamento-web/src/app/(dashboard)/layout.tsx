@@ -1,5 +1,6 @@
 import Layout from "@/components/layout";
 import ChatWidget from "@/components/ChatWidget";
+import { MotoConsultaFAB } from "@/components/MotoConsultaFAB";
 
 export default function DashboardLayout({
     children,
@@ -10,6 +11,7 @@ export default function DashboardLayout({
         <Layout>
             {children}
             <ChatWidget />
+            <MotoConsultaFAB />
         </Layout>
     );
 }

@@ -194,11 +194,15 @@ export const useStorage = () => {
                 .from(bucket)
                 .upload(fileName, file, { contentType: file.type, upsert: true });
 
-            if (error) return "";
+            if (error) {
+                console.error(`[startUpload] Error uploading to bucket ${bucket}:`, error);
+                return "";
+            }
 
             const { data: urlData } = supabase.storage.from(bucket).getPublicUrl(fileName);
             return urlData.publicUrl;
         } catch (e) {
+            console.error(`[startUpload] Exception uploading to bucket ${bucket}:`, e);
             return "";
         }
     };
@@ -610,6 +614,16 @@ export const useStorage = () => {
         } catch { return []; }
     }, []);
 
+    const getTodasEncomendasIncompletas = useCallback(async () => {
+        try {
+            const { data } = await supabase
+                .from('encomendas_incompletas')
+                .select('*')
+                .order('data_chegada', { ascending: false });
+            return data || [];
+        } catch { return []; }
+    }, []);
+
     const resolverEncomendaIncompleta = useCallback(async (
         idIncompleta: number,
         dadosReais: { moradorId: number, destinatario: string, descricao: string, fotoUrl: string, retiradoPor: string }
@@ -699,6 +713,121 @@ export const useStorage = () => {
         } catch { return false; }
     }, []);
 
+    // --- CONTROLE DE MOTOS ---
+    const limparMotosAntigas = useCallback(async () => {
+        try {
+            const tresDiasAtras = new Date();
+            tresDiasAtras.setDate(tresDiasAtras.getDate() - 3);
+
+            const { data: antigos } = await supabase
+                .from('controle_motos')
+                .select('id, foto_url')
+                .lt('data_entrada', tresDiasAtras.toISOString());
+
+            if (antigos && antigos.length > 0) {
+                const fileNames = antigos
+                    .filter(m => m.foto_url)
+                    .map(m => {
+                        const parts = m.foto_url.split('/');
+                        return parts[parts.length - 1];
+                    });
+
+                if (fileNames.length > 0) {
+                    await supabase.storage.from('motos').remove(fileNames);
+                }
+
+                const ids = antigos.map(m => m.id);
+                await supabase.from('controle_motos').delete().in('id', ids);
+            }
+        } catch (e) {
+            console.error("Erro ao limpar motos antigas", e);
+        }
+    }, []);
+
+    const getTodasMotos = useCallback(async () => {
+        try {
+            const moradores = await getMoradoresBase();
+            return moradores.filter((m: any) => m.moto_detalhes && m.moto_detalhes.trim().length > 0);
+        } catch { return []; }
+    }, [getMoradoresBase]);
+
+    const registrarEntradaMoto = useCallback(async (dados: { morador_nome: string, apartamento: string, bloco: string, moto_detalhes: string, fotoFile: File | null }) => {
+        try {
+            const fotoUrl = dados.fotoFile ? await startUpload(dados.fotoFile, 'motos') : "";
+
+            if (dados.fotoFile && !fotoUrl) {
+                console.error("[registrarEntradaMoto] Foto foi fornecida mas URL retornou vazia (provável falha de upload)");
+            }
+
+            const { error } = await supabase.from('controle_motos').insert([{
+                morador_nome: formatarNomeProprio(dados.morador_nome),
+                apartamento: dados.apartamento,
+                bloco: dados.bloco,
+                moto_detalhes: dados.moto_detalhes,
+                foto_url: fotoUrl
+            }]);
+
+            if (error) {
+                console.error("[registrarEntradaMoto] Erro ao inserir no banco controle_motos:", error);
+            }
+
+            return !error;
+        } catch (e) {
+            console.error("[registrarEntradaMoto] Exceção geral:", e);
+            return false;
+        }
+    }, []);
+
+    const getHistoricoMotos = useCallback(async () => {
+        try {
+            const { data } = await supabase
+                .from('controle_motos')
+                .select('*')
+                .order('data_entrada', { ascending: false });
+            return data || [];
+        } catch { return []; }
+    }, []);
+    // --- SALÃO DE FESTAS ---
+    const getEventosSalao = useCallback(async () => {
+        try {
+            const { data } = await supabase
+                .from('salao_festas')
+                .select(`
+                    *,
+                    morador:moradores(nome_responsavel, apartamento, bloco)
+                `)
+                .order('data_evento', { ascending: true });
+            return data || [];
+        } catch { return []; }
+    }, []);
+
+    const getEventosPorMorador = useCallback(async (moradorId: number) => {
+        try {
+            const { data } = await supabase
+                .from('salao_festas')
+                .select('*')
+                .eq('morador_id', moradorId)
+                .order('data_evento', { ascending: false });
+            return data || [];
+        } catch { return []; }
+    }, []);
+
+    const registrarEventoSalao = useCallback(async (dados: { morador_id: number, apartamento: string, bloco: string, bloco_salao: string, data_evento: string, lista_convidados: string }) => {
+        try {
+            const { error } = await supabase.from('salao_festas').insert([{
+                ...dados
+            }]);
+            return !error;
+        } catch { return false; }
+    }, []);
+
+    const removerEventoSalao = useCallback(async (id: number) => {
+        try {
+            const { error } = await supabase.from('salao_festas').delete().eq('id', id);
+            return !error;
+        } catch { return false; }
+    }, []);
+
     return {
         // ... (existing exports)
         removerVisita,
@@ -706,6 +835,7 @@ export const useStorage = () => {
         solicitarNovoCadastro,
         registrarEncomendaIncompleta,
         getEncomendasIncompletas,
+        getTodasEncomendasIncompletas,
         resolverEncomendaIncompleta,
         sincronizarMoradores, salvarMoradorBase, getMoradoresBase,
         getVeiculos, salvarVeiculo, removerVeiculo, getHistorico, limparHistorico, limparAtivos,
@@ -716,7 +846,9 @@ export const useStorage = () => {
         loginAdmin, cadastroAdmin, removerMoradorBase,
         removerPrestador, atualizarEncomenda,
         agendarVisita, getVisitasAgendadas, concluirAgendamento, cancelarAgendamento,
-        getHistoricoVisitas
+        getHistoricoVisitas,
+        limparMotosAntigas, getTodasMotos, registrarEntradaMoto, getHistoricoMotos,
+        getEventosSalao, getEventosPorMorador, registrarEventoSalao, removerEventoSalao
     };
 };
 
