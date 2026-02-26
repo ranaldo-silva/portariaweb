@@ -15,7 +15,7 @@ import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 
 export default function Encomendas() {
-    const { getMoradoresBase, registrarEncomenda, getEncomendasAtivas, validarTokenRetirada, removerEncomenda, darBaixaEncomendaPorFoto } = useStorage();
+    const { getMoradoresBase, registrarEncomenda, registrarEncomendaAvulsa, getEncomendasAtivas, validarTokenRetirada, removerEncomenda, darBaixaEncomendaPorFoto } = useStorage();
 
     const [busca, setBusca] = useState('');
     const [moradores, setMoradores] = useState<any[]>([]);
@@ -23,6 +23,12 @@ export default function Encomendas() {
     const [destinatarioFinal, setDestinatarioFinal] = useState('');
     const [origem, setOrigem] = useState('');
     const [fotoFile, setFotoFile] = useState<File | null>(null);
+
+    const [filtroAp, setFiltroAp] = useState('');
+    const [filtroBloco, setFiltroBloco] = useState('');
+    const [novoAp, setNovoAp] = useState('');
+    const [novoBloco, setNovoBloco] = useState('');
+    const [mostrarAvulso, setMostrarAvulso] = useState(false);
 
     const [userRole, setUserRole] = useState<string>('');
     useEffect(() => {
@@ -69,13 +75,24 @@ export default function Encomendas() {
     };
 
     const handleRegistrar = async () => {
-        if (!moradorSel || !origem || !destinatarioFinal) {
-            alert("Selecione morador, destinatário e origem.");
+        if (!origem || !destinatarioFinal) {
+            alert("Selecione destinatário e origem.");
             return;
         }
+        if (!moradorSel && (!novoAp)) {
+            alert("Preencha o apartamento do morador avulso ou selecione um morador na busca.");
+            return;
+        }
+
         setLoading(true);
         const token = Math.floor(1000 + Math.random() * 9000).toString();
-        const sucesso = await registrarEncomenda(moradorSel, origem, token, fotoFile, destinatarioFinal);
+        let sucesso = false;
+
+        if (moradorSel) {
+            sucesso = await registrarEncomenda(moradorSel, origem, token, fotoFile, destinatarioFinal);
+        } else {
+            sucesso = await registrarEncomendaAvulsa(novoAp, novoBloco, origem, token, fotoFile, destinatarioFinal);
+        }
 
         if (sucesso) {
             // Em vez de só alertar, salvar os dados temporariamente para exibir a tela de confirmação/geração de PDF
@@ -83,9 +100,9 @@ export default function Encomendas() {
                 token,
                 origem,
                 nome_responsavel: destinatarioFinal,
-                apartamento: moradorSel.apartamento,
-                bloco: moradorSel.bloco,
-                whatsapp: moradorSel.whatsapp,
+                apartamento: moradorSel ? moradorSel.apartamento : novoAp,
+                bloco: moradorSel ? moradorSel.bloco : novoBloco,
+                whatsapp: moradorSel ? moradorSel.whatsapp : "",
                 fotoPreview: fotoFile ? URL.createObjectURL(fotoFile) : null
             });
 
@@ -93,6 +110,9 @@ export default function Encomendas() {
             setDestinatarioFinal('');
             setOrigem('');
             setBusca('');
+            setNovoAp('');
+            setNovoBloco('');
+            setMostrarAvulso(false);
             setFotoFile(null);
             carregarDados();
         } else {
@@ -171,6 +191,9 @@ export default function Encomendas() {
         setReciboGerado(null);
         setBusca('');
         setMoradorSel(null);
+        setNovoAp('');
+        setNovoBloco('');
+        setMostrarAvulso(false);
         setDestinatarioFinal('');
         setOrigem('');
         setFotoFile(null);
@@ -231,7 +254,7 @@ export default function Encomendas() {
                             className="pl-9 bg-white text-black"
                         />
                         {busca.length > 0 && !moradorSel && (
-                            <div className="absolute z-10 w-full bg-white border mt-1 rounded shadow-lg max-h-40 overflow-y-auto">
+                            <div className="absolute z-10 w-full bg-white border mt-1 rounded shadow-lg max-h-56 overflow-y-auto">
                                 {moradores
                                     .filter(m => String(m.nome_responsavel || "").toLowerCase().includes(busca.toLowerCase()) || String(m.apartamento).includes(busca))
                                     .slice(0, 5)
@@ -239,15 +262,43 @@ export default function Encomendas() {
                                         <div
                                             key={m.id}
                                             className="p-2 hover:bg-gray-100 cursor-pointer text-black border-b"
-                                            onClick={() => { setMoradorSel(m); setDestinatarioFinal(m.nome_responsavel); setBusca(m.nome_responsavel); }}
+                                            onClick={() => { setMoradorSel(m); setDestinatarioFinal(m.nome_responsavel); setBusca(m.nome_responsavel); setMostrarAvulso(false); }}
                                         >
                                             <strong>{m.nome_responsavel}</strong>
                                             <div className="text-xs text-gray-500">AP: {m.apartamento} {m.bloco}</div>
                                         </div>
                                     ))}
+                                <div
+                                    className="p-3 hover:bg-blue-100 cursor-pointer text-blue-700 text-sm font-bold text-center bg-blue-50"
+                                    onClick={() => { setMostrarAvulso(true); setBusca(''); }}
+                                >
+                                    + Registrar Unidade/Morador Avulso
+                                </div>
                             </div>
                         )}
                     </div>
+
+                    {/* Avulso Inputs */}
+                    {mostrarAvulso && !moradorSel && (
+                        <div className="bg-navy p-4 rounded border border-blue-500/50 mt-2 space-y-3 shadow-inner">
+                            <p className="text-sm border-b pb-1 text-blue-400 font-bold border-blue-900 mb-2">Registro Avulso (Morador Não Cadastrado)</p>
+                            <div className="grid grid-cols-2 gap-2">
+                                <div>
+                                    <label className="text-xs text-gray-400">Apartamento *</label>
+                                    <Input placeholder="Ex: 101" value={novoAp} onChange={(e) => setNovoAp(e.target.value)} className="bg-navy-light text-white" />
+                                </div>
+                                <div>
+                                    <label className="text-xs text-gray-400">Bloco (Opcional)</label>
+                                    <Input placeholder="Ex: A" value={novoBloco} onChange={(e) => setNovoBloco(e.target.value)} className="bg-navy-light text-white" />
+                                </div>
+                            </div>
+                            <div>
+                                <label className="text-xs text-gray-400">Nome do Destinatário *</label>
+                                <Input placeholder="Nome na Etiqueta" value={destinatarioFinal} onChange={(e) => setDestinatarioFinal(e.target.value)} className="bg-navy-light text-white" />
+                            </div>
+                            <Button size="sm" variant="ghost" className="w-full text-red-400 hover:text-red-300 hover:bg-red-400/10" onClick={() => setMostrarAvulso(false)}>Cancelar Avulso</Button>
+                        </div>
+                    )}
 
                     {/* Detalhes do Morador */}
                     {moradorSel && (
@@ -362,56 +413,67 @@ export default function Encomendas() {
 
             {/* LISTA PENDENTES */}
             <div className="space-y-4">
-                <h2 className="text-xl font-bold text-white mb-4">Na Portaria ({encomendasPendentes.length})</h2>
-                {encomendasPendentes.length === 0 && <p className="text-gray-500">Nenhuma encomenda pendente.</p>}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
+                    <h2 className="text-xl font-bold text-white">Na Portaria ({encomendasPendentes.length})</h2>
+                    <div className="flex gap-2">
+                        <Input placeholder="Filtro AP" className="w-24 bg-navy-light border-gray-600 text-white h-9 text-sm" value={filtroAp} onChange={e => setFiltroAp(e.target.value)} />
+                        <Input placeholder="Filtro Bloco" className="w-28 bg-navy-light border-gray-600 text-white h-9 text-sm" value={filtroBloco} onChange={e => setFiltroBloco(e.target.value)} />
+                    </div>
+                </div>
+
+                {encomendasPendentes
+                    .filter(enc => (!filtroAp || String(enc.apartamento) === filtroAp) && (!filtroBloco || String(enc.bloco).toLowerCase() === filtroBloco.toLowerCase()))
+                    .length === 0 && <p className="text-gray-500">Nenhuma encomenda encontrada para os filtros aplicados.</p>}
 
                 <div className="space-y-3 max-h-[80vh] overflow-y-auto pr-2">
-                    {encomendasPendentes.map(enc => (
-                        <Card key={enc.id} className="bg-white border-none shadow-sm cursor-pointer hover:bg-gray-50 transition-colors">
-                            <CardContent className="p-4 flex items-center gap-3" onClick={() => setItemDetalhes(enc)}>
-                                {enc.foto_url ? (
-                                    <img src={enc.foto_url} className="w-12 h-12 rounded object-cover bg-gray-200" alt="Pacote" />
-                                ) : (
-                                    <div className="w-12 h-12 rounded bg-navy-light flex items-center justify-center text-gold">
-                                        <Package size={24} />
-                                    </div>
-                                )}
-
-                                <div className="flex-1 min-w-0">
-                                    <h4 className="font-bold text-navy truncate">{enc.moradores?.nome_responsavel || "Desconhecido"}</h4>
-                                    <p className="text-sm text-gray-600 truncate">Origem: {enc.origem} • AP {enc.apartamento}</p>
-                                    {enc.destinatario && <p className="text-xs text-blue-600 font-bold">Para: {enc.destinatario}</p>}
-                                    <p className="text-xs text-gray-400">{new Date(enc.data_chegada).toLocaleString()}</p>
-                                </div>
-                            </CardContent>
-                            {/* Actions outside onClick to avoid triggering modal */}
-                            <div className="flex flex-col gap-2 p-2 pt-0 z-10 w-full sm:w-auto">
-                                <Button size="sm" className="bg-blue-600 hover:bg-blue-700 h-8 font-bold w-full" onClick={(e) => { e.stopPropagation(); handleBaixa(enc.id, enc.token); }}>
-                                    BAIXA TOKEN/CPF
-                                </Button>
-                                <div className="flex gap-2">
-                                    <Button size="sm" variant="outline" className="border-blue-600 text-blue-600 hover:bg-blue-50 h-8 flex-1 font-bold tracking-tight px-1" onClick={(e) => {
-                                        e.stopPropagation();
-                                        setBaixaFotoModalItem(enc);
-                                        setBaixaNomeRecebedor(enc.destinatario || enc.moradores?.nome_responsavel || '');
-                                    }}>
-                                        <Camera size={14} className="mr-1" /> FOTO
-                                    </Button>
-                                    {userRole !== 'porteiro' && (
-                                        <Button size="icon" variant="ghost" className="h-8 w-8 text-red-500 hover:bg-red-50 shrink-0" onClick={async (e) => {
-                                            e.stopPropagation();
-                                            if (confirm("Excluir encomenda?")) {
-                                                await removerEncomenda(enc.id);
-                                                carregarDados();
-                                            }
-                                        }}>
-                                            <Trash2 size={16} />
-                                        </Button>
+                    {encomendasPendentes
+                        .filter(enc => (!filtroAp || String(enc.apartamento) === filtroAp) && (!filtroBloco || String(enc.bloco).toLowerCase() === filtroBloco.toLowerCase()))
+                        .map(enc => (
+                            <Card key={enc.id} className="bg-white border-none shadow-sm cursor-pointer hover:bg-gray-50 transition-colors">
+                                <CardContent className="p-4 flex items-center gap-3" onClick={() => setItemDetalhes(enc)}>
+                                    {enc.foto_url ? (
+                                        <img src={enc.foto_url} className="w-12 h-12 rounded object-cover bg-gray-200" alt="Pacote" />
+                                    ) : (
+                                        <div className="w-12 h-12 rounded bg-navy-light flex items-center justify-center text-gold">
+                                            <Package size={24} />
+                                        </div>
                                     )}
+
+                                    <div className="flex-1 min-w-0">
+                                        <h4 className="font-bold text-navy truncate">{enc.moradores?.nome_responsavel || "Desconhecido"}</h4>
+                                        <p className="text-sm text-gray-600 truncate">Origem: {enc.origem} • AP {enc.apartamento}</p>
+                                        {enc.destinatario && <p className="text-xs text-blue-600 font-bold">Para: {enc.destinatario}</p>}
+                                        <p className="text-xs text-gray-400">{new Date(enc.data_chegada).toLocaleString()}</p>
+                                    </div>
+                                </CardContent>
+                                {/* Actions outside onClick to avoid triggering modal */}
+                                <div className="flex flex-col gap-2 p-2 pt-0 z-10 w-full sm:w-auto">
+                                    <Button size="sm" className="bg-blue-600 hover:bg-blue-700 h-8 font-bold w-full" onClick={(e) => { e.stopPropagation(); handleBaixa(enc.id, enc.token); }}>
+                                        BAIXA TOKEN/CPF
+                                    </Button>
+                                    <div className="flex gap-2">
+                                        <Button size="sm" variant="outline" className="border-blue-600 text-blue-600 hover:bg-blue-50 h-8 flex-1 font-bold tracking-tight px-1" onClick={(e) => {
+                                            e.stopPropagation();
+                                            setBaixaFotoModalItem(enc);
+                                            setBaixaNomeRecebedor(enc.destinatario || enc.moradores?.nome_responsavel || '');
+                                        }}>
+                                            <Camera size={14} className="mr-1" /> FOTO
+                                        </Button>
+                                        {userRole !== 'porteiro' && (
+                                            <Button size="icon" variant="ghost" className="h-8 w-8 text-red-500 hover:bg-red-50 shrink-0" onClick={async (e) => {
+                                                e.stopPropagation();
+                                                if (confirm("Excluir encomenda?")) {
+                                                    await removerEncomenda(enc.id);
+                                                    carregarDados();
+                                                }
+                                            }}>
+                                                <Trash2 size={16} />
+                                            </Button>
+                                        )}
+                                    </div>
                                 </div>
-                            </div>
-                        </Card>
-                    ))}
+                            </Card>
+                        ))}
                 </div>
             </div>
 

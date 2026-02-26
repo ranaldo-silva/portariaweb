@@ -243,6 +243,50 @@ export const useStorage = () => {
         }
     }, []);
 
+    const registrarEncomendaAvulsa = useCallback(async (apartamento: string, bloco: string, origem: string, token: string, file: File | null, destinatario: string) => {
+        try {
+            // 1. Criar morador temporário
+            let moradorId = null;
+            const { data: novoMorador, error: errMorador } = await supabase.from('moradores').insert([{
+                nome_responsavel: "Pendente Cadastro",
+                apartamento: parseInt(apartamento) || 0,
+                bloco: (bloco || "").toUpperCase(),
+                lista_moradores: formatarNomeProprio(destinatario || "")
+            }]).select().single();
+
+            if (!errMorador && novoMorador) {
+                moradorId = novoMorador.id;
+            }
+
+            // 2. Upload da foto
+            let urlPublica = "";
+            if (file) {
+                urlPublica = await startUpload(file, 'encomendas');
+            }
+
+            // 3. Registrar a encomenda
+            const { error } = await supabase.from('encomendas').insert([{
+                morador_id: moradorId,
+                apartamento: parseInt(apartamento) || 0,
+                bloco: (bloco || "").toUpperCase(),
+                origem: origem,
+                token: token,
+                foto_url: urlPublica || "",
+                status: 'Pendente',
+                data_chegada: new Date().toISOString(),
+                destinatario: destinatario
+            }]);
+
+            if (!error && moradorId) {
+                await sincronizarMoradores(true);
+            }
+
+            return !error;
+        } catch (e) {
+            return false;
+        }
+    }, [sincronizarMoradores]);
+
     const getEncomendasAtivas = useCallback(async () => {
         try {
             const { data } = await supabase
@@ -878,7 +922,7 @@ export const useStorage = () => {
         resolverEncomendaIncompleta,
         sincronizarMoradores, salvarMoradorBase, getMoradoresBase,
         getVeiculos, salvarVeiculo, removerVeiculo, getHistorico, limparHistorico, limparAtivos,
-        registrarEncomenda, getEncomendasAtivas, getTodasEncomendas, validarTokenRetirada, removerEncomenda,
+        registrarEncomenda, registrarEncomendaAvulsa, getEncomendasAtivas, getTodasEncomendas, validarTokenRetirada, removerEncomenda,
         salvarPrestador, registrarVisita, getPrestadores, getVisitas,
         enviarAlerta, getAlertas, removerAlerta, editarAlerta,
         salvarPlantao, getPlantao, getHistoricoPlantoes,
