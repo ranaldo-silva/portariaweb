@@ -64,8 +64,6 @@ export function ConsultaMotosModal({ onClose }: ConsultaMotosModalProps) {
     };
 
     const handleCapture = async (file: File | null, morador: any) => {
-        if (!file) return;
-
         setProcessingId(morador.id);
         const success = await registrarEntradaMoto({
             morador_nome: morador.nome_responsavel,
@@ -153,11 +151,11 @@ export function ConsultaMotosModal({ onClose }: ConsultaMotosModalProps) {
                         <>
                             {activeTab === 'lista' && (
                                 <div className="space-y-4">
-                                    <div className="relative">
+                                    <div className="sticky top-0 z-10 bg-navy pb-2 relative">
                                         <Search className="absolute left-3 top-3 text-gray-400" size={20} />
                                         <Input
                                             placeholder="Buscar por morador, moto, ap ou bloco..."
-                                            className="pl-10 bg-navy-light border-gray-600 text-white placeholder-gray-400 focus:border-gold"
+                                            className="pl-10 bg-navy-light border-gray-600 text-white placeholder-gray-400 focus:border-gold w-full"
                                             value={searchTerm}
                                             onChange={(e) => setSearchTerm(e.target.value)}
                                         />
@@ -179,7 +177,15 @@ export function ConsultaMotosModal({ onClose }: ConsultaMotosModalProps) {
                                                         </div>
                                                     </div>
 
-                                                    <div className="shrink-0 w-full sm:w-auto">
+                                                    <div className="shrink-0 w-full sm:w-auto flex flex-col sm:flex-row gap-2">
+                                                        <Button
+                                                            variant="outline"
+                                                            disabled={processingId === m.id}
+                                                            onClick={(e) => { e.stopPropagation(); handleCapture(null, m); }}
+                                                            className="w-full sm:w-auto border-gold/50 text-gold hover:bg-gold/10 font-bold"
+                                                        >
+                                                            Sem Foto
+                                                        </Button>
                                                         <CameraAutoCapture onCapture={(file) => handleCapture(file, m)}>
                                                             <Button
                                                                 disabled={processingId === m.id}

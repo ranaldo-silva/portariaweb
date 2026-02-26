@@ -10,9 +10,12 @@ import { Search, Camera, Send, Package, Check, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { DetailsModal } from '@/components/DetailsModal';
 import { CameraAutoCapture } from '@/components/CameraAutoCapture';
+import { ReceiptTemplate } from '@/components/ReceiptTemplate';
+import html2canvas from 'html2canvas';
+import jsPDF from 'jspdf';
 
 export default function Encomendas() {
-    const { getMoradoresBase, registrarEncomenda, getEncomendasAtivas, validarTokenRetirada, removerEncomenda } = useStorage();
+    const { getMoradoresBase, registrarEncomenda, getEncomendasAtivas, validarTokenRetirada, removerEncomenda, darBaixaEncomendaPorFoto } = useStorage();
 
     const [busca, setBusca] = useState('');
     const [moradores, setMoradores] = useState<any[]>([]);
@@ -20,13 +23,25 @@ export default function Encomendas() {
     const [destinatarioFinal, setDestinatarioFinal] = useState('');
     const [origem, setOrigem] = useState('');
     const [fotoFile, setFotoFile] = useState<File | null>(null);
+
+    const [userRole, setUserRole] = useState<string>('');
+    useEffect(() => {
+        setUserRole(localStorage.getItem('userRole') || '');
+    }, []);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const receiptRef = useRef<HTMLDivElement>(null);
 
     const [encomendasPendentes, setEncomendasPendentes] = useState<any[]>([]);
     const [itemDetalhes, setItemDetalhes] = useState<any>(null); // Details state
     const [tokenDigitado, setTokenDigitado] = useState('');
     const [loading, setLoading] = useState(false);
     const [notificarWhats, setNotificarWhats] = useState(false);
+    const [reciboGerado, setReciboGerado] = useState<any>(null); // State for the success view
+
+    // Photo Delivery Modal State
+    const [baixaFotoModalItem, setBaixaFotoModalItem] = useState<any>(null);
+    const [baixaNomeRecebedor, setBaixaNomeRecebedor] = useState('');
+    const [baixaProcessando, setBaixaProcessando] = useState(false);
 
     const origensComuns = ["Shopee", "Mercado Livre", "Shein", "Amazon", "Correios", "99Food", "KeeTa", "Transportadora"];
 
@@ -63,14 +78,16 @@ export default function Encomendas() {
         const sucesso = await registrarEncomenda(moradorSel, origem, token, fotoFile, destinatarioFinal);
 
         if (sucesso) {
-            const mensagem = `📦 *ENCOMENDA NA PORTARIA*\n\nOlá, *${destinatarioFinal}*.\nSua encomenda da *${origem}* chegou.\n\n🔐 *TOKEN PARA RETIRADA:* ${token}`;
-            const url = `https://wa.me/55${moradorSel.whatsapp.replace(/\D/g, "")}?text=${encodeURIComponent(mensagem)}`;
-
-
-
-            if (notificarWhats) {
-                window.open(url, '_blank');
-            }
+            // Em vez de só alertar, salvar os dados temporariamente para exibir a tela de confirmação/geração de PDF
+            setReciboGerado({
+                token,
+                origem,
+                nome_responsavel: destinatarioFinal,
+                apartamento: moradorSel.apartamento,
+                bloco: moradorSel.bloco,
+                whatsapp: moradorSel.whatsapp,
+                fotoPreview: fotoFile ? URL.createObjectURL(fotoFile) : null
+            });
 
             setMoradorSel(null);
             setDestinatarioFinal('');
@@ -84,6 +101,81 @@ export default function Encomendas() {
         setLoading(false);
     };
 
+    const handleDownloadPDF = async () => {
+        if (!receiptRef.current) return;
+        try {
+            const canvas = await html2canvas(receiptRef.current, { scale: 2, useCORS: true });
+            const imgData = canvas.toDataURL('image/jpeg', 0.9);
+            const pdf = new jsPDF('p', 'mm', 'a4');
+            const pdfWidth = pdf.internal.pageSize.getWidth();
+            const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+            pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
+            pdf.save(`Encomenda_${reciboGerado.apartamento}_${reciboGerado.nome_responsavel}.pdf`);
+        } catch (error) {
+            console.error("Erro ao gerar PDF", error);
+            alert("Não foi possível gerar o PDF.");
+        }
+    };
+
+    const handleConcluirECompartilhar = async () => {
+        if (!receiptRef.current || !reciboGerado) return;
+
+        try {
+            const canvas = await html2canvas(receiptRef.current, { scale: 2, useCORS: true });
+            const imgData = canvas.toDataURL('image/jpeg', 0.9);
+            const pdf = new jsPDF('p', 'mm', 'a4');
+            const pdfWidth = pdf.internal.pageSize.getWidth();
+            const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+            pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
+
+            const fileName = `Encomenda_${reciboGerado.apartamento}_${reciboGerado.nome_responsavel.replace(/ /g, '_')}.pdf`;
+
+            let local = `Apto: ${reciboGerado.apartamento}`;
+            if (reciboGerado.bloco) local += ` - Bloco: ${reciboGerado.bloco}`;
+            const text = `*Registro de Encomenda*\nMorador(a): ${reciboGerado.nome_responsavel}\n${local}\n\n_(A foto de confirmação segue em anexo)_`;
+
+            let compartilhadoNativamente = false;
+
+            // Tentativa de compartilhamento direto (Mobile / Browsers compatíveis)
+            if (navigator.share) {
+                const pdfBlob = pdf.output('blob');
+                const file = new File([pdfBlob], fileName, { type: 'application/pdf' });
+
+                if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                    try {
+                        await navigator.share({
+                            files: [file],
+                            title: 'Comprovante de Encomenda',
+                            text: text
+                        });
+                        compartilhadoNativamente = true;
+                    } catch (e) {
+                        console.log("Compartilhamento nativo cancelado ou falhou", e);
+                    }
+                }
+            }
+
+            // Fallback para PC ou caso o nativo falhe: Baixa o PDF e abre o link web do WhatsApp
+            if (!compartilhadoNativamente) {
+                pdf.save(fileName);
+                const url = `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`;
+                window.open(url, '_blank');
+            }
+
+        } catch (error) {
+            console.error("Erro ao gerar PDF", error);
+            alert("Não foi possível gerar/compartilhar o PDF.");
+        }
+
+        // Limpar a tela para registrar nova encomenda imediatamente
+        setReciboGerado(null);
+        setBusca('');
+        setMoradorSel(null);
+        setDestinatarioFinal('');
+        setOrigem('');
+        setFotoFile(null);
+    };
+
     const handleBaixa = async (id: string, tokenReal: string) => {
         const tokenInput = prompt("Digite o TOKEN ou CPF para retirada:");
         if (!tokenInput) return;
@@ -91,6 +183,30 @@ export default function Encomendas() {
         const res = await validarTokenRetirada(id, tokenInput);
         if (res.sucesso) {
             alert("Entrega confirmada!");
+            carregarDados();
+        } else {
+            alert(res.msg);
+        }
+    };
+
+    const handleBaixaPorFotoConfirmar = async (file: File | null) => {
+        if (!file) {
+            alert("Você precisa tirar a foto para confirmar a entrega!");
+            return;
+        }
+        if (!baixaNomeRecebedor.trim()) {
+            alert("Por favor, digite o nome de quem está retirando a encomenda.");
+            return;
+        }
+
+        setBaixaProcessando(true);
+        const res = await darBaixaEncomendaPorFoto(baixaFotoModalItem.id, file, baixaNomeRecebedor);
+        setBaixaProcessando(false);
+
+        if (res.sucesso) {
+            alert("Entrega confirmada por foto com sucesso!");
+            setBaixaFotoModalItem(null);
+            setBaixaNomeRecebedor('');
             carregarDados();
         } else {
             alert(res.msg);
@@ -210,14 +326,37 @@ export default function Encomendas() {
                         </label>
                     </div>
 
-                    <Button
-                        className="w-full bg-success text-white font-bold h-12"
-                        onClick={handleRegistrar}
-                        disabled={loading}
-                    >
-                        <Send className="mr-2" size={18} />
-                        {loading ? "ENVIANDO..." : (notificarWhats ? "NOTIFICAR WHATSAPP" : "REGISTRAR ENCOMENDA")}
-                    </Button>
+                    {!reciboGerado && (
+                        <Button
+                            className="w-full bg-success text-white font-bold h-12"
+                            onClick={handleRegistrar}
+                            disabled={loading}
+                        >
+                            <Send className="mr-2" size={18} />
+                            {loading ? "ENVIANDO..." : "REGISTRAR ENCOMENDA"}
+                        </Button>
+                    )}
+
+                    {/* SUCCESS VIEW (PDF / WHATSAPP ACTIONS) */}
+                    {reciboGerado && (
+                        <div className="mt-4 p-4 bg-green-900/40 border border-green-500 rounded-lg animate-in fade-in slide-in-from-bottom-2">
+                            <div className="flex items-center text-green-400 font-bold mb-3">
+                                <Check className="mr-2" size={24} /> Encomenda Registrada com Sucesso!
+                            </div>
+                            <p className="text-sm text-gray-300 mb-4">
+                                Você já pode gerar o comprovante, enviar pelo WhatsApp e realizar um novo registro tudo em um clique!
+                            </p>
+                            <div className="flex flex-col gap-3">
+                                <Button className="w-full bg-green-600 hover:bg-green-700 text-white h-12 font-bold shadow-lg" onClick={handleConcluirECompartilhar}>
+                                    <Send className="mr-2" size={18} /> GERAR PDF E ABRIR WHATSAPP
+                                </Button>
+                                <Button variant="ghost" className="w-full text-gray-400 mt-2" onClick={() => setReciboGerado(null)}>
+                                    Realizar Novo Registro
+                                </Button>
+                            </div>
+                        </div>
+                    )}
+
                 </CardContent>
             </Card>
 
@@ -246,19 +385,30 @@ export default function Encomendas() {
                                 </div>
                             </CardContent>
                             {/* Actions outside onClick to avoid triggering modal */}
-                            <div className="flex flex-col gap-2 p-2 pt-0 z-10">
-                                <Button size="sm" className="bg-blue-600 hover:bg-blue-700 h-8" onClick={(e) => { e.stopPropagation(); handleBaixa(enc.id, enc.token); }}>
-                                    BAIXA
+                            <div className="flex flex-col gap-2 p-2 pt-0 z-10 w-full sm:w-auto">
+                                <Button size="sm" className="bg-blue-600 hover:bg-blue-700 h-8 font-bold w-full" onClick={(e) => { e.stopPropagation(); handleBaixa(enc.id, enc.token); }}>
+                                    BAIXA TOKEN/CPF
                                 </Button>
-                                <Button size="icon" variant="ghost" className="h-8 w-8 text-red-500 hover:bg-red-50" onClick={async (e) => {
-                                    e.stopPropagation();
-                                    if (confirm("Excluir encomenda?")) {
-                                        await removerEncomenda(enc.id);
-                                        carregarDados();
-                                    }
-                                }}>
-                                    <Trash2 size={16} />
-                                </Button>
+                                <div className="flex gap-2">
+                                    <Button size="sm" variant="outline" className="border-blue-600 text-blue-600 hover:bg-blue-50 h-8 flex-1 font-bold tracking-tight px-1" onClick={(e) => {
+                                        e.stopPropagation();
+                                        setBaixaFotoModalItem(enc);
+                                        setBaixaNomeRecebedor(enc.destinatario || enc.moradores?.nome_responsavel || '');
+                                    }}>
+                                        <Camera size={14} className="mr-1" /> FOTO
+                                    </Button>
+                                    {userRole !== 'porteiro' && (
+                                        <Button size="icon" variant="ghost" className="h-8 w-8 text-red-500 hover:bg-red-50 shrink-0" onClick={async (e) => {
+                                            e.stopPropagation();
+                                            if (confirm("Excluir encomenda?")) {
+                                                await removerEncomenda(enc.id);
+                                                carregarDados();
+                                            }
+                                        }}>
+                                            <Trash2 size={16} />
+                                        </Button>
+                                    )}
+                                </div>
                             </div>
                         </Card>
                     ))}
@@ -271,6 +421,63 @@ export default function Encomendas() {
                 title="Detalhes da Encomenda"
                 data={itemDetalhes}
                 type="encomenda"
+            />
+
+            {/* Modal para Baixa por Foto */}
+            {baixaFotoModalItem && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+                    <Card className="w-full max-w-sm bg-navy border-blue-500 shadow-2xl animate-in fade-in zoom-in duration-200">
+                        <CardHeader className="pb-3 border-b border-gray-700">
+                            <CardTitle className="text-xl font-bold text-white flex justify-between items-center">
+                                Baixa por Foto
+                                <Button variant="ghost" size="icon" onClick={() => setBaixaFotoModalItem(null)} className="h-8 w-8 text-gray-400 hover:text-white">
+                                    ✕
+                                </Button>
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="pt-4 space-y-4">
+                            <div className="bg-blue-900/20 p-3 rounded text-sm text-blue-200 border border-blue-500/30">
+                                <p><strong>Morador:</strong> {baixaFotoModalItem.moradores?.nome_responsavel}</p>
+                                <p><strong>Unidade:</strong> AP {baixaFotoModalItem.apartamento}</p>
+                            </div>
+
+                            <div className="space-y-2">
+                                <label className="text-sm font-semibold text-white">Nome de quem está retirando:</label>
+                                <Input
+                                    value={baixaNomeRecebedor}
+                                    onChange={(e) => setBaixaNomeRecebedor(e.target.value)}
+                                    placeholder="Ex: João da Silva (Filho)"
+                                    className="bg-navy-light text-white border-gray-600 focus:border-blue-500 rounded"
+                                />
+                            </div>
+
+                            <div className="pt-2">
+                                <CameraAutoCapture onCapture={handleBaixaPorFotoConfirmar} accept="image/*" capture="user">
+                                    <Button
+                                        disabled={baixaProcessando || !baixaNomeRecebedor.trim()}
+                                        className={`w-full h-12 text-sm font-bold shadow-lg ${baixaProcessando ? 'bg-gray-600' : 'bg-blue-600 hover:bg-blue-500 text-white'}`}
+                                    >
+                                        {baixaProcessando ? (
+                                            "Processando..."
+                                        ) : (
+                                            <>
+                                                <Camera size={20} className="mr-2" /> Capturar Foto e Entregar
+                                            </>
+                                        )}
+                                    </Button>
+                                </CameraAutoCapture>
+                                <p className="text-xs text-gray-500 text-center mt-3">A foto servirá como comprovante eterno de retirada.</p>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </div>
+            )}
+
+            {/* Hidden Receipt Template for PDF generation */}
+            <ReceiptTemplate
+                ref={receiptRef}
+                encomenda={reciboGerado}
+                condominioName="Portaria Web"
             />
         </div >
     );

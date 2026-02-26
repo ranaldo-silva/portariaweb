@@ -115,11 +115,29 @@ export function DetailsModal({ isOpen, onClose, title, data, type = 'morador', o
                                     <p><strong className="text-gold">Status:</strong> {data.status}</p>
                                     <p><strong className="text-gold">Chegada:</strong> {new Date(data.data_chegada).toLocaleString('pt-BR')}</p>
                                     {data.data_retirada && <p><strong className="text-gold">Retirada:</strong> {new Date(data.data_retirada).toLocaleString('pt-BR')}</p>}
-                                    {data.retirado_por && <p><strong className="text-gold">Retirado Por:</strong> {data.retirado_por}</p>}
-                                    {data.foto_url && (
+                                    {data.retirado_por && (
+                                        <div className="bg-navy-light p-2 rounded border border-gray-700 mt-2">
+                                            <strong className="text-gold block mb-1">Entregue Para:</strong>
+                                            <p className="text-blue-400 font-bold">{data.retirado_por}</p>
+                                        </div>
+                                    )}
+
+                                    {data.foto_url && !data.foto_baixa_url && (
                                         <div className="mt-2">
-                                            <strong className="text-gold">Foto:</strong>
-                                            <img src={data.foto_url} alt="Encomenda" className="w-full h-48 object-cover rounded mt-1 border border-gray-600" />
+                                            <strong className="text-gold block mb-2 text-sm">Foto da Etiqueta:</strong>
+                                            <img src={data.foto_url} alt="Etiqueta Encomenda" className="w-full h-48 object-cover rounded mt-1 border border-gray-600 block cursor-zoom-in" onClick={() => window.open(data.foto_url, '_blank')} />
+                                        </div>
+                                    )}
+
+                                    {data.foto_baixa_url && (
+                                        <div className="mt-4 flex flex-col items-center">
+                                            <strong className="text-blue-400 block mb-2 w-full text-left text-sm font-bold uppercase tracking-wider">Evidência de Entrega (Foto):</strong>
+                                            <img src={data.foto_baixa_url} alt="Foto da Baixa" className="w-full max-h-80 object-contain rounded-lg border-2 border-blue-500 shadow-lg bg-black cursor-zoom-in" onClick={() => window.open(data.foto_baixa_url, '_blank')} title="Clique para expandir" />
+                                            {data.foto_url && (
+                                                <div className="mt-4 w-full text-left">
+                                                    <span className="text-xs text-gray-500 mb-1 block">Ver também: <button onClick={() => window.open(data.foto_url, '_blank')} className="text-gold underline hover:text-white">Foto da Etiqueta (Chegada)</button></span>
+                                                </div>
+                                            )}
                                         </div>
                                     )}
                                 </>

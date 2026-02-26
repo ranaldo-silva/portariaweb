@@ -302,10 +302,49 @@ export const useStorage = () => {
                     data_retirada: new Date().toISOString(),
                     retirado_por: metodoRetirada
                 }).eq('id', tokenId);
-            return { sucesso: !updateError, msg: updateError ? "Erro no servidor" : "Retirada confirmada!" };
-        } catch { return { sucesso: false, msg: "Erro de conexão" }; }
+            return { sucesso: !updateError, msg: updateError ? "Erro ao atualizar banco." : "Retirada confirmada!" };
+        } catch (e) {
+            return { sucesso: false, msg: "Falha de conexão." };
+        }
     }, []);
 
+    const darBaixaEncomendaPorFoto = useCallback(async (id: string, file: File, nomeRecebedor: string) => {
+        try {
+            // 1. Upload the photo to the new bucket
+            const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.jpg`;
+            const { error: uploadError } = await supabase.storage
+                .from('baixa_encomendas')
+                .upload(fileName, file, { contentType: file.type, upsert: true });
+
+            if (uploadError) {
+                console.error("Erro no upload da foto de baixa:", uploadError);
+                return { sucesso: false, msg: "Erro ao enviar a foto da entrega." };
+            }
+
+            const { data: urlData } = supabase.storage.from('baixa_encomendas').getPublicUrl(fileName);
+            const fotoBaixaUrl = urlData.publicUrl;
+
+            // 2. Update the row with Retirado status, the photo URL, and the receiver's name
+            const { error: updateError } = await supabase
+                .from('encomendas')
+                .update({
+                    status: 'Retirado',
+                    retirado_por: formatarNomeProprio(nomeRecebedor) + " (Por Foto)",
+                    foto_baixa_url: fotoBaixaUrl
+                })
+                .eq('id', id);
+
+            if (updateError) {
+                console.error("Erro ao dar baixa com foto no banco:", updateError);
+                return { sucesso: false, msg: "Erro ao registrar a baixa no sistema." };
+            }
+
+            return { sucesso: true, msg: "Baixa registrada com sucesso!" };
+        } catch (e) {
+            console.error("Exceção na baixa por foto:", e);
+            return { sucesso: false, msg: "Falha de conexão ao salvar a baixa por foto." };
+        }
+    }, [formatarNomeProprio]);
 
     const atualizarEncomenda = useCallback(async (id: string, dados: any) => {
         try {
@@ -848,7 +887,7 @@ export const useStorage = () => {
         agendarVisita, getVisitasAgendadas, concluirAgendamento, cancelarAgendamento,
         getHistoricoVisitas,
         limparMotosAntigas, getTodasMotos, registrarEntradaMoto, getHistoricoMotos,
+        darBaixaEncomendaPorFoto,
         getEventosSalao, getEventosPorMorador, registrarEventoSalao, removerEventoSalao
     };
 };
-
