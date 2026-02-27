@@ -151,8 +151,8 @@ export default function Encomendas() {
 
             const fileName = `Encomenda_${reciboGerado.apartamento}_${reciboGerado.nome_responsavel.replace(/ /g, '_')}.pdf`;
 
-            let local = `Apto: ${reciboGerado.apartamento}`;
-            if (reciboGerado.bloco) local += ` - Bloco: ${reciboGerado.bloco}`;
+            const blocoExibicao = reciboGerado.bloco ? reciboGerado.bloco : "Único/Não Informado";
+            const local = `Apto: ${reciboGerado.apartamento} - Bloco: ${blocoExibicao}`;
             const text = `*Registro de Encomenda*\nMorador(a): ${reciboGerado.nome_responsavel}\n${local}\n\n_(A foto de confirmação segue em anexo)_`;
 
             let compartilhadoNativamente = false;
