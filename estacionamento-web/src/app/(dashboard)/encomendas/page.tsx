@@ -443,7 +443,7 @@ export default function Encomendas() {
 
                                     <div className="flex-1 min-w-0">
                                         <h4 className="font-bold text-navy truncate">{enc.moradores?.nome_responsavel || "Desconhecido"}</h4>
-                                        <p className="text-sm text-gray-600 truncate">Origem: {enc.origem} • AP {enc.apartamento}</p>
+                                        <p className="text-sm text-gray-600 truncate">Origem: {enc.origem} • AP {enc.apartamento}{enc.bloco ? ` • BLC ${enc.bloco}` : ''}</p>
                                         {enc.destinatario && <p className="text-xs text-blue-600 font-bold">Para: {enc.destinatario}</p>}
                                         <p className="text-xs text-gray-400">{new Date(enc.data_chegada).toLocaleString()}</p>
                                     </div>
