@@ -34,17 +34,10 @@ export function CameraAutoCapture({ onCapture, children, fallbackInputName, acce
     }, [stopCamera]);
 
     const handleTriggerClick = async () => {
-        // Try to open camera first
-        if (typeof navigator !== 'undefined' && navigator.mediaDevices && !!navigator.mediaDevices.getUserMedia) {
-            await startCamera();
-            // If starting the camera triggers an error immediately, fall back
-            if (!stream && error) {
-                fileInputRef.current?.click();
-            }
-        } else {
-            // Fallback to normal input if no mediaDevices
-            fileInputRef.current?.click();
-        }
+        // Agora invocamos a câmera NATIVA do aparelho instantaneamente
+        // O `capture="environment"` no input file oculta vai abrir a tela 
+        // de câmera original do celular, o que resolve o problema de foco.
+        fileInputRef.current?.click();
     };
 
     // If starting camera failed later, fall back
