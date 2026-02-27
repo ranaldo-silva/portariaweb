@@ -352,7 +352,7 @@ export const useStorage = () => {
         }
     }, []);
 
-    const darBaixaEncomendaPorFoto = useCallback(async (id: string, file: File, nomeRecebedor: string) => {
+    const darBaixaEncomendaPorFoto = useCallback(async (id: string, file: File, nomeRecebedor: string, cpfRecebedor: string = "") => {
         try {
             // 1. Upload the photo to the new bucket
             const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.jpg`;
@@ -373,7 +373,7 @@ export const useStorage = () => {
                 .from('encomendas')
                 .update({
                     status: 'Retirado',
-                    retirado_por: formatarNomeProprio(nomeRecebedor) + " (Por Foto)",
+                    retirado_por: formatarNomeProprio(nomeRecebedor) + (cpfRecebedor ? ` (CPF: ${cpfRecebedor})` : "") + " (Por Foto)",
                     foto_baixa_url: fotoBaixaUrl
                 })
                 .eq('id', id);

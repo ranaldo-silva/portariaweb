@@ -47,6 +47,7 @@ export default function Encomendas() {
     // Photo Delivery Modal State
     const [baixaFotoModalItem, setBaixaFotoModalItem] = useState<any>(null);
     const [baixaNomeRecebedor, setBaixaNomeRecebedor] = useState('');
+    const [baixaCpfRecebedor, setBaixaCpfRecebedor] = useState('');
     const [baixaProcessando, setBaixaProcessando] = useState(false);
 
     const origensComuns = ["Shopee", "Mercado Livre", "Shein", "Amazon", "Correios", "99Food", "KeeTa", "Transportadora"];
@@ -223,13 +224,14 @@ export default function Encomendas() {
         }
 
         setBaixaProcessando(true);
-        const res = await darBaixaEncomendaPorFoto(baixaFotoModalItem.id, file, baixaNomeRecebedor);
+        const res = await darBaixaEncomendaPorFoto(baixaFotoModalItem.id, file, baixaNomeRecebedor, baixaCpfRecebedor);
         setBaixaProcessando(false);
 
         if (res.sucesso) {
             alert("Entrega confirmada por foto com sucesso!");
             setBaixaFotoModalItem(null);
             setBaixaNomeRecebedor('');
+            setBaixaCpfRecebedor('');
             carregarDados();
         } else {
             alert(res.msg);
@@ -456,6 +458,7 @@ export default function Encomendas() {
                                             e.stopPropagation();
                                             setBaixaFotoModalItem(enc);
                                             setBaixaNomeRecebedor(enc.destinatario || enc.moradores?.nome_responsavel || '');
+                                            setBaixaCpfRecebedor('');
                                         }}>
                                             <Camera size={14} className="mr-1" /> FOTO
                                         </Button>
@@ -509,6 +512,17 @@ export default function Encomendas() {
                                     value={baixaNomeRecebedor}
                                     onChange={(e) => setBaixaNomeRecebedor(e.target.value)}
                                     placeholder="Ex: João da Silva (Filho)"
+                                    className="bg-navy-light text-white border-gray-600 focus:border-blue-500 rounded"
+                                />
+                            </div>
+
+                            <div className="space-y-2 mt-3">
+                                <label className="text-sm font-semibold text-white">CPF (Opcional):</label>
+                                <Input
+                                    value={baixaCpfRecebedor}
+                                    onChange={(e) => setBaixaCpfRecebedor(e.target.value.replace(/\D/g, '').replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d{1,2})$/, '$1-$2'))}
+                                    placeholder="000.000.000-00"
+                                    maxLength={14}
                                     className="bg-navy-light text-white border-gray-600 focus:border-blue-500 rounded"
                                 />
                             </div>
