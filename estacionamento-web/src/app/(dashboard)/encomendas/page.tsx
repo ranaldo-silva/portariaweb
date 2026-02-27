@@ -44,10 +44,11 @@ export default function Encomendas() {
     const [notificarWhats, setNotificarWhats] = useState(false);
     const [reciboGerado, setReciboGerado] = useState<any>(null); // State for the success view
 
-    // Photo Delivery Modal State
     const [baixaFotoModalItem, setBaixaFotoModalItem] = useState<any>(null);
     const [baixaNomeRecebedor, setBaixaNomeRecebedor] = useState('');
     const [baixaCpfRecebedor, setBaixaCpfRecebedor] = useState('');
+    const [baixaFinalizaCadastro, setBaixaFinalizaCadastro] = useState(false);
+    const [baixaLoteIds, setBaixaLoteIds] = useState<string[]>([]);
     const [baixaProcessando, setBaixaProcessando] = useState(false);
 
     const origensComuns = ["Shopee", "Mercado Livre", "Shein", "Amazon", "Correios", "99Food", "KeeTa", "Transportadora"];
@@ -84,6 +85,20 @@ export default function Encomendas() {
             alert("Preencha o apartamento do morador avulso ou selecione um morador na busca.");
             return;
         }
+
+        // --- VALIDAÇÃO DE DUPLICIDADE AVULSO ---
+        if (!moradorSel && novoAp) {
+            const existeNaBase = moradores.find(m =>
+                String(m.apartamento) === novoAp &&
+                (m.bloco || "").toLowerCase() === (novoBloco || "").toLowerCase()
+            );
+
+            if (existeNaBase) {
+                alert(`Atenção: A unidade AP ${existeNaBase.apartamento} ${existeNaBase.bloco ? `Bloco ${existeNaBase.bloco}` : ''} já possui cadastro no sistema como "${existeNaBase.nome_responsavel}". Por favor, busque na barra de pesquisa e selecione o morador existente.`);
+                return;
+            }
+        }
+        // ----------------------------------------
 
         setLoading(true);
         const token = Math.floor(1000 + Math.random() * 9000).toString();
@@ -224,18 +239,55 @@ export default function Encomendas() {
         }
 
         setBaixaProcessando(true);
-        const res = await darBaixaEncomendaPorFoto(baixaFotoModalItem.id, file, baixaNomeRecebedor, baixaCpfRecebedor);
+
+        const idsParaBaixar = baixaLoteIds.length > 0 ? baixaLoteIds : [baixaFotoModalItem.id];
+        let sucessoGeral = true;
+        let msgErro = "";
+
+        for (const pacoteId of idsParaBaixar) {
+            const res = await darBaixaEncomendaPorFoto(
+                pacoteId,
+                file,
+                baixaNomeRecebedor,
+                baixaCpfRecebedor,
+                baixaFinalizaCadastro,
+                baixaFotoModalItem.morador_id
+            );
+            if (!res.sucesso) {
+                sucessoGeral = false;
+                msgErro = res.msg;
+            }
+        }
+
         setBaixaProcessando(false);
 
-        if (res.sucesso) {
-            alert("Entrega confirmada por foto com sucesso!");
+        if (sucessoGeral) {
+            alert(idsParaBaixar.length > 1 ? `Entrega de ${idsParaBaixar.length} pacotes confirmada com sucesso!` : "Entrega confirmada por foto com sucesso!");
             setBaixaFotoModalItem(null);
             setBaixaNomeRecebedor('');
             setBaixaCpfRecebedor('');
+            setBaixaFinalizaCadastro(false);
+            setBaixaLoteIds([]);
             carregarDados();
         } else {
-            alert(res.msg);
+            alert(msgErro || "Erro ao baixar alguns pacotes.");
         }
+    };
+
+    const handleOpenBaixaFotoModal = (enc: any) => {
+        setBaixaFotoModalItem(enc);
+        // Find all packages for the same apartment and block
+        const pacotesDoMesmoApto = encomendasPendentes.filter(
+            (item: any) => item.apartamento === enc.apartamento && item.bloco === enc.bloco
+        );
+        // Pre-select all of them for batch baixa
+        setBaixaLoteIds(pacotesDoMesmoApto.map((item: any) => item.id));
+    };
+
+    const handleToggleBaixaLoteId = (id: string) => {
+        setBaixaLoteIds(prev =>
+            prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
+        );
     };
 
     return (
@@ -459,6 +511,15 @@ export default function Encomendas() {
                                             setBaixaFotoModalItem(enc);
                                             setBaixaNomeRecebedor(enc.destinatario || enc.moradores?.nome_responsavel || '');
                                             setBaixaCpfRecebedor('');
+                                            setBaixaFinalizaCadastro(false);
+
+                                            // Auto-detect other packages for the same unit
+                                            const pacotesDoMesmoAp = encomendasPendentes.filter(p =>
+                                                p.id !== enc.id &&
+                                                p.apartamento === enc.apartamento &&
+                                                (p.bloco || "").toLowerCase() === (enc.bloco || "").toLowerCase()
+                                            );
+                                            setBaixaLoteIds([enc.id, ...pacotesDoMesmoAp.map(p => p.id)]);
                                         }}>
                                             <Camera size={14} className="mr-1" /> FOTO
                                         </Button>
@@ -506,6 +567,37 @@ export default function Encomendas() {
                                 <p><strong>Unidade:</strong> AP {baixaFotoModalItem.apartamento}</p>
                             </div>
 
+                            {/* Detecção de Múltiplos Pacotes */}
+                            {baixaLoteIds.length > 1 && (
+                                <div className="bg-yellow-900/40 border border-yellow-600/50 p-3 rounded">
+                                    <h4 className="font-bold text-yellow-500 text-sm mb-2 flex items-center">
+                                        <Package className="mr-2" size={16} />
+                                        {baixaLoteIds.length} pacotes pendentes para o AP {baixaFotoModalItem.apartamento}
+                                    </h4>
+                                    <p className="text-xs text-yellow-200/80 mb-3">
+                                        Desmarque os pacotes que <strong>não</strong> serão entregues agora:
+                                    </p>
+                                    <div className="space-y-2 max-h-32 overflow-y-auto pr-2">
+                                        {encomendasPendentes
+                                            .filter(p => p.apartamento === baixaFotoModalItem.apartamento && p.bloco === baixaFotoModalItem.bloco)
+                                            .map(p => (
+                                                <div key={p.id} className="flex items-center gap-2 text-sm text-white">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={baixaLoteIds.includes(p.id)}
+                                                        onChange={(e) => {
+                                                            if (e.target.checked) setBaixaLoteIds([...baixaLoteIds, p.id]);
+                                                            else setBaixaLoteIds(baixaLoteIds.filter(id => id !== p.id));
+                                                        }}
+                                                        className="w-4 h-4 rounded border-gray-300 text-yellow-500 focus:ring-yellow-500 bg-navy"
+                                                    />
+                                                    <span className="truncate">{p.origem} {p.destinatario ? `(${p.destinatario})` : ''}</span>
+                                                </div>
+                                            ))}
+                                    </div>
+                                </div>
+                            )}
+
                             <div className="space-y-2">
                                 <label className="text-sm font-semibold text-white">Nome de quem está retirando:</label>
                                 <Input
@@ -526,6 +618,23 @@ export default function Encomendas() {
                                     className="bg-navy-light text-white border-gray-600 focus:border-blue-500 rounded"
                                 />
                             </div>
+
+                            {/* Opcional: Efetivar Cadastro Avulso */}
+                            {baixaFotoModalItem?.moradores?.nome_responsavel === "Pendente Cadastro" && (
+                                <div className="mt-4 p-3 bg-blue-900/30 border border-blue-500/50 rounded flex gap-3 items-start">
+                                    <input
+                                        type="checkbox"
+                                        id="efetivar"
+                                        checked={baixaFinalizaCadastro}
+                                        onChange={(e) => setBaixaFinalizaCadastro(e.target.checked)}
+                                        className="mt-1 w-5 h-5 rounded border-gray-300 text-blue-500 focus:ring-blue-500"
+                                    />
+                                    <label htmlFor="efetivar" className="text-sm text-blue-100 cursor-pointer">
+                                        <span className="font-bold block">Efetivar Morador Desta Unidade?</span>
+                                        Salvar no sistema o NOME e CPF acima como o responsável definitivo da unidade AP {baixaFotoModalItem.apartamento}.
+                                    </label>
+                                </div>
+                            )}
 
                             <div className="pt-2">
                                 <CameraAutoCapture onCapture={handleBaixaPorFotoConfirmar} accept="image/*" capture="user">

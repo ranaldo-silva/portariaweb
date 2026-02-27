@@ -352,7 +352,7 @@ export const useStorage = () => {
         }
     }, []);
 
-    const darBaixaEncomendaPorFoto = useCallback(async (id: string, file: File, nomeRecebedor: string, cpfRecebedor: string = "") => {
+    const darBaixaEncomendaPorFoto = useCallback(async (id: string, file: File, nomeRecebedor: string, cpfRecebedor: string = "", efetivarCadastro: boolean = false, moradorId?: any) => {
         try {
             // 1. Upload the photo to the new bucket
             const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.jpg`;
@@ -381,6 +381,24 @@ export const useStorage = () => {
             if (updateError) {
                 console.error("Erro ao dar baixa com foto no banco:", updateError);
                 return { sucesso: false, msg: "Erro ao registrar a baixa no sistema." };
+            }
+
+            // 3. Efetivar cadastro avulso se solicitado
+            if (efetivarCadastro && moradorId) {
+                const { error: moradorUpdateErr } = await supabase
+                    .from('moradores')
+                    .update({
+                        nome_responsavel: formatarNomeProprio(nomeRecebedor),
+                        cpf: cpfRecebedor ? cpfRecebedor.replace(/\D/g, "") : "",
+                        lista_moradores: "" // Limpando dependentes antigas do avulso
+                    })
+                    .eq('id', moradorId);
+
+                if (!moradorUpdateErr) {
+                    await sincronizarMoradores(true);
+                } else {
+                    console.error("Erro ao efetivar morador:", moradorUpdateErr);
+                }
             }
 
             return { sucesso: true, msg: "Baixa registrada com sucesso!" };
