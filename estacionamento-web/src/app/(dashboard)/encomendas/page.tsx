@@ -6,9 +6,9 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge'; // Wait, I didn't create Badge, I'll inline styles
-import { Search, Camera, Send, Package, Check, Trash2, FileText } from 'lucide-react';
+import { Search, Camera, Send, Package, Check, Trash2, FileText, MessageCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { generateReportHTML, printHTML } from '@/lib/print';
+import { generateReportHTML, printHTML, shareReportViaWhatsApp } from '@/lib/print';
 import { DetailsModal } from '@/components/DetailsModal';
 import { CameraAutoCapture } from '@/components/CameraAutoCapture';
 import { ReceiptTemplate } from '@/components/ReceiptTemplate';
@@ -320,6 +320,35 @@ export default function Encomendas() {
         printHTML(generateReportHTML("Relatório de Encomendas (Entregues)", data));
     };
 
+    const handleWhatsAppRelatorioPendentes = () => {
+        const data = encomendasPendentes.map(e => ({
+            Data: new Date(e.data_chegada).toLocaleDateString(),
+            Chegada: new Date(e.data_chegada).toLocaleTimeString(),
+            Destinatario: e.destinatario || e.moradores?.nome_responsavel,
+            Apartamento: `AP ${e.apartamento} ${e.bloco || ''}`.trim(),
+            Origem: e.origem,
+            Status: e.status,
+            Foto: e.foto_url
+        }));
+        shareReportViaWhatsApp("Relatório de Encomendas (Na Portaria)", data);
+    };
+
+    const handleWhatsAppRelatorioEntregues = async () => {
+        const todas = await getTodasEncomendas();
+        const entregues = todas.filter((e: any) => e.status === 'Entregue');
+        const data = entregues.map((e: any) => ({
+            Data: new Date(e.data_chegada).toLocaleDateString(),
+            Destinatario: e.destinatario || e.moradores?.nome_responsavel,
+            Apartamento: `AP ${e.apartamento} ${e.bloco || ''}`.trim(),
+            Origem: e.origem,
+            Status: e.status,
+            Retirada: e.data_retirada ? new Date(e.data_retirada).toLocaleString() : '-',
+            Retirado_Por: e.retirado_por || '-',
+            Foto: e.foto_url
+        }));
+        shareReportViaWhatsApp("Relatório de Encomendas (Entregues)", data);
+    };
+
     return (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* REGISTRO */}
@@ -500,12 +529,22 @@ export default function Encomendas() {
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
                     <h2 className="text-xl font-bold text-white">Na Portaria ({encomendasPendentes.length})</h2>
                     <div className="flex gap-2 flex-wrap items-center">
-                        <Button size="sm" variant="outline" className="border-gold text-gold hover:bg-gold hover:text-navy font-bold" onClick={handleGerarRelatorioPendentes}>
-                            <FileText size={16} className="mr-1" /> PDF Pendentes
-                        </Button>
-                        <Button size="sm" variant="outline" className="border-green-500 text-green-500 hover:bg-green-500 hover:text-white font-bold" onClick={handleGerarRelatorioEntregues}>
-                            <Check size={16} className="mr-1" /> PDF Entregues
-                        </Button>
+                        <div className="flex gap-1">
+                            <Button size="sm" variant="outline" className="border-gold text-gold hover:bg-gold hover:text-navy font-bold rounded-r-none" onClick={handleGerarRelatorioPendentes}>
+                                <FileText size={16} className="md:mr-1" /> <span className="hidden md:inline">PDF Pendentes</span>
+                            </Button>
+                            <Button size="sm" className="bg-green-600 text-white hover:bg-green-700 font-bold rounded-l-none" onClick={handleWhatsAppRelatorioPendentes} title="Enviar Pendentes WhatsApp">
+                                <MessageCircle size={16} />
+                            </Button>
+                        </div>
+                        <div className="flex gap-1">
+                            <Button size="sm" variant="outline" className="border-green-500 text-green-500 hover:bg-green-500 hover:text-white font-bold rounded-r-none" onClick={handleGerarRelatorioEntregues}>
+                                <Check size={16} className="md:mr-1" /> <span className="hidden md:inline">PDF Entregues</span>
+                            </Button>
+                            <Button size="sm" className="bg-green-600 text-white hover:bg-green-700 font-bold rounded-l-none" onClick={handleWhatsAppRelatorioEntregues} title="Enviar Entregues WhatsApp">
+                                <MessageCircle size={16} />
+                            </Button>
+                        </div>
                         <Input placeholder="Filtro AP" className="w-24 bg-navy-light border-gray-600 text-white h-9 text-sm" value={filtroAp} onChange={e => setFiltroAp(e.target.value)} />
                         <Input placeholder="Filtro Bloco" className="w-28 bg-navy-light border-gray-600 text-white h-9 text-sm" value={filtroBloco} onChange={e => setFiltroBloco(e.target.value)} />
                     </div>
