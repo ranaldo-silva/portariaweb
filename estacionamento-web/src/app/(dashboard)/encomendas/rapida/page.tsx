@@ -10,7 +10,7 @@ import { DetailsModal } from '@/components/DetailsModal';
 import { CameraAutoCapture } from '@/components/CameraAutoCapture';
 
 export default function EncomendasRapida() {
-    const { registrarEncomendaIncompleta, getEncomendasIncompletas, resolverEncomendaIncompleta, getMoradoresBase } = useStorage();
+    const { registrarEncomendaIncompleta, getEncomendasIncompletas, resolverEncomendaIncompleta, getMoradoresBase, salvarMoradorBase } = useStorage();
 
     const [loading, setLoading] = useState(false);
     const [fotoFile, setFotoFile] = useState<File | null>(null);
@@ -27,6 +27,19 @@ export default function EncomendasRapida() {
     const [selectedMorador, setSelectedMorador] = useState<any>(null);
     const [destinatario, setDestinatario] = useState('');
     const [retiradoPor, setRetiradoPor] = useState('');
+
+    const [showNovoMorador, setShowNovoMorador] = useState(false);
+    const [formNovoMorador, setFormNovoMorador] = useState({
+        id: '',
+        nome: '',
+        ap: '',
+        bloco: '',
+        modelo: '',
+        moto: '',
+        dependentes: '',
+        whatsapp: '',
+        cpf: ''
+    });
 
     const carregar = async () => {
         const [inc, mor] = await Promise.all([getEncomendasIncompletas(), getMoradoresBase()]);
@@ -72,6 +85,38 @@ export default function EncomendasRapida() {
         setSelectedMorador(null);
         setDestinatario('');
         setRetiradoPor('');
+        setShowNovoMorador(false);
+    };
+
+    const handleSalvarNovoMorador = async () => {
+        if (!formNovoMorador.nome) { alert("Nome obrigatório"); return; }
+        setLoading(true);
+
+        const ok = await salvarMoradorBase(formNovoMorador);
+        if (ok) {
+            alert("Unidade cadastrada com sucesso!");
+
+            // Recarrega moradores para obter o novo
+            const mList = await getMoradoresBase();
+            if (mList) setMoradores(mList);
+
+            const novo = mList?.find((m: any) =>
+                m.nome_responsavel === formNovoMorador.nome &&
+                String(m.apartamento) === String(formNovoMorador.ap) &&
+                m.bloco === formNovoMorador.bloco
+            );
+
+            if (novo) {
+                setSelectedMorador(novo);
+                setSearchMorador(novo.nome_responsavel);
+            }
+
+            setShowNovoMorador(false);
+            setFormNovoMorador({ id: '', nome: '', ap: '', bloco: '', modelo: '', moto: '', dependentes: '', whatsapp: '', cpf: '' });
+        } else {
+            alert("Erro ao cadastrar unidade.");
+        }
+        setLoading(false);
     };
 
     const handleConfirmarIdentificacao = async () => {
@@ -202,71 +247,111 @@ export default function EncomendasRapida() {
                             <CardDescription>Vincule esta encomenda a um morador para dar baixa.</CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-4 pt-4">
-                            {/* 1. Search Resident */}
-                            <div className="space-y-2">
-                                <label className="text-sm font-bold text-gray-700">Buscar Unidade</label>
-                                <div className="relative">
-                                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
-                                    <Input
-                                        placeholder="Digite Ap ou Nome"
-                                        value={searchMorador}
-                                        onChange={e => setSearchMorador(e.target.value)}
-                                        className="pl-9"
+                            {showNovoMorador ? (
+                                <div className="space-y-4">
+                                    <h3 className="font-bold text-lg text-navy border-b pb-2">Nova Unidade</h3>
+                                    <Input placeholder="Nome Responsável" value={formNovoMorador.nome} onChange={e => setFormNovoMorador({ ...formNovoMorador, nome: e.target.value })} className="bg-white text-black" />
+                                    <Input placeholder="CPF (Apenas números)" value={formNovoMorador.cpf} onChange={e => setFormNovoMorador({ ...formNovoMorador, cpf: e.target.value })} className="bg-white text-black" />
+
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <Input placeholder="Carro (Modelo, Placa)" value={formNovoMorador.modelo} onChange={e => setFormNovoMorador({ ...formNovoMorador, modelo: e.target.value })} className="bg-white text-black" />
+                                        <Input placeholder="Moto (Modelo, Placa)" value={formNovoMorador.moto} onChange={e => setFormNovoMorador({ ...formNovoMorador, moto: e.target.value })} className="bg-white text-black" />
+                                    </div>
+
+                                    <div className="grid grid-cols-3 gap-4">
+                                        <Input placeholder="AP" type="number" value={formNovoMorador.ap} onChange={e => setFormNovoMorador({ ...formNovoMorador, ap: e.target.value })} className="bg-white text-black" />
+                                        <Input placeholder="Bloco" value={formNovoMorador.bloco} onChange={e => setFormNovoMorador({ ...formNovoMorador, bloco: e.target.value.toUpperCase() })} className="bg-white text-black" />
+                                        <Input placeholder="WhatsApp" value={formNovoMorador.whatsapp} onChange={e => setFormNovoMorador({ ...formNovoMorador, whatsapp: e.target.value })} className="bg-white text-black" />
+                                    </div>
+
+                                    <textarea
+                                        className="w-full rounded-md border border-input bg-white px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 text-black min-h-[80px]"
+                                        placeholder="Dependentes (separados por vírgula)"
+                                        value={formNovoMorador.dependentes}
+                                        onChange={e => setFormNovoMorador({ ...formNovoMorador, dependentes: e.target.value })}
                                     />
-                                    {searchMorador.length > 0 && !selectedMorador && (
-                                        <div className="absolute z-10 w-full bg-white border mt-1 shadow-xl max-h-40 overflow-y-auto rounded-md text-black">
-                                            {filtrados.map(m => (
-                                                <div
-                                                    key={m.id}
-                                                    className="p-2 hover:bg-blue-50 cursor-pointer border-b"
-                                                    onClick={() => {
-                                                        setSelectedMorador(m);
-                                                        setSearchMorador(m.nome_responsavel);
-                                                    }}
-                                                >
-                                                    <strong>{m.nome_responsavel}</strong> (AP {m.apartamento} {m.bloco})
+
+                                    <div className="flex gap-2 justify-end pt-2">
+                                        <Button variant="ghost" onClick={() => setShowNovoMorador(false)}>Voltar</Button>
+                                        <Button className="bg-gold hover:bg-gold-hover text-navy font-bold" onClick={handleSalvarNovoMorador} disabled={loading}>
+                                            <Save size={18} className="mr-2" /> SALVAR UNIDADE
+                                        </Button>
+                                    </div>
+                                </div>
+                            ) : (
+                                <>
+                                    {/* 1. Search Resident */}
+                                    <div className="space-y-2">
+                                        <div className="flex justify-between items-center">
+                                            <label className="text-sm font-bold text-gray-700">Buscar Unidade</label>
+                                            <Button variant="link" className="text-blue-600 h-auto p-0 text-sm" onClick={() => setShowNovoMorador(true)}>
+                                                + Cadastrar Nova Unidade
+                                            </Button>
+                                        </div>
+                                        <div className="relative">
+                                            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
+                                            <Input
+                                                placeholder="Digite Ap ou Nome"
+                                                value={searchMorador}
+                                                onChange={e => setSearchMorador(e.target.value)}
+                                                className="pl-9"
+                                            />
+                                            {searchMorador.length > 0 && !selectedMorador && (
+                                                <div className="absolute z-10 w-full bg-white border mt-1 shadow-xl max-h-40 overflow-y-auto rounded-md text-black">
+                                                    {filtrados.map(m => (
+                                                        <div
+                                                            key={m.id}
+                                                            className="p-2 hover:bg-blue-50 cursor-pointer border-b"
+                                                            onClick={() => {
+                                                                setSelectedMorador(m);
+                                                                setSearchMorador(m.nome_responsavel);
+                                                            }}
+                                                        >
+                                                            <strong>{m.nome_responsavel}</strong> (AP {m.apartamento} {m.bloco})
+                                                        </div>
+                                                    ))}
                                                 </div>
-                                            ))}
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    {selectedMorador && (
+                                        <div className="bg-blue-50 p-2 rounded border border-blue-200 text-sm text-blue-900">
+                                            Selecionado: <strong>{selectedMorador.nome_responsavel}</strong> - {selectedMorador.apartamento} {selectedMorador.bloco}
                                         </div>
                                     )}
-                                </div>
-                            </div>
 
-                            {selectedMorador && (
-                                <div className="bg-blue-50 p-2 rounded border border-blue-200 text-sm text-blue-900">
-                                    Selecionado: <strong>{selectedMorador.nome_responsavel}</strong> - {selectedMorador.apartamento} {selectedMorador.bloco}
-                                </div>
+                                    {/* 2. Destinatario Real */}
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-bold text-gray-700">Destinatário (Nome na Caixa)</label>
+                                        <Input
+                                            value={destinatario}
+                                            onChange={e => setDestinatario(e.target.value)}
+                                            placeholder="Ex: João da Silva"
+                                        />
+                                        <p className="text-xs text-blue-600">
+                                            * Se este nome não existir no cadastro, será solicitada inclusão automaticamente.
+                                        </p>
+                                    </div>
+
+                                    {/* 3. Retirado Por */}
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-bold text-gray-700">Retirado Por</label>
+                                        <Input
+                                            value={retiradoPor}
+                                            onChange={e => setRetiradoPor(e.target.value)}
+                                            placeholder="Quem pegou a caixa?"
+                                        />
+                                    </div>
+
+                                    <div className="flex gap-2 justify-end pt-4">
+                                        <Button variant="ghost" onClick={() => setIdentificando(null)}>Cancelar</Button>
+                                        <Button className="bg-green-600 hover:bg-green-700" onClick={handleConfirmarIdentificacao} disabled={loading}>
+                                            <Check className="mr-2" /> {loading ? "Processando..." : "Concluir"}
+                                        </Button>
+                                    </div>
+                                </>
                             )}
-
-                            {/* 2. Destinatario Real */}
-                            <div className="space-y-2">
-                                <label className="text-sm font-bold text-gray-700">Destinatário (Nome na Caixa)</label>
-                                <Input
-                                    value={destinatario}
-                                    onChange={e => setDestinatario(e.target.value)}
-                                    placeholder="Ex: João da Silva"
-                                />
-                                <p className="text-xs text-blue-600">
-                                    * Se este nome não existir no cadastro, será solicitada inclusão automaticamente.
-                                </p>
-                            </div>
-
-                            {/* 3. Retirado Por */}
-                            <div className="space-y-2">
-                                <label className="text-sm font-bold text-gray-700">Retirado Por</label>
-                                <Input
-                                    value={retiradoPor}
-                                    onChange={e => setRetiradoPor(e.target.value)}
-                                    placeholder="Quem pegou a caixa?"
-                                />
-                            </div>
-
-                            <div className="flex gap-2 justify-end pt-4">
-                                <Button variant="ghost" onClick={() => setIdentificando(null)}>Cancelar</Button>
-                                <Button className="bg-green-600 hover:bg-green-700" onClick={handleConfirmarIdentificacao} disabled={loading}>
-                                    <Check className="mr-2" /> {loading ? "Processando..." : "Concluir"}
-                                </Button>
-                            </div>
                         </CardContent>
                     </Card>
                 </div>

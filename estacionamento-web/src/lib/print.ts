@@ -7,7 +7,6 @@ export const printHTML = (htmlContent: string) => {
         // Wait for content to load/render (images etc)
         setTimeout(() => {
             printWindow.print();
-            printWindow.close();
         }, 500);
     }
 };
