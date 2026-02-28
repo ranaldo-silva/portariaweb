@@ -328,14 +328,8 @@ export const useStorage = () => {
                 autorizado = true;
                 metodoRetirada = "Token";
             }
-            else if (enc.moradores && enc.moradores.cpf) {
-                const cpfMorador = enc.moradores.cpf.replace(/\D/g, '');
-                if (inputClean.length > 0 && inputClean === cpfMorador) {
-                    autorizado = true;
-                    metodoRetirada = `CPF: ${inputClean.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4")}`;
-                }
-            }
             else if (inputClean.length === 11) {
+                // Aceita qualquer pessoa desde que apresente um CPF válido de 11 dígitos
                 autorizado = true;
                 metodoRetirada = `CPF: ${inputClean.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4")}`;
             }
@@ -358,6 +352,7 @@ export const useStorage = () => {
                 }
                 
                 if (dadosCompletos) {
+                    if (dadosCompletos.nomeTitular) updateData.nome_responsavel = formatarNomeProprio(dadosCompletos.nomeTitular);
                     if (dadosCompletos.whatsapp) updateData.whatsapp = dadosCompletos.whatsapp.replace(/\D/g, "");
                     if (dadosCompletos.carro) updateData.carro_detalhes = dadosCompletos.carro.toUpperCase();
                     if (dadosCompletos.moto) updateData.moto_detalhes = dadosCompletos.moto.toUpperCase();
@@ -416,7 +411,7 @@ export const useStorage = () => {
             // 3. Efetivar cadastro avulso se solicitado
             if (efetivarCadastro && moradorId) {
                 const updateData: any = {
-                    nome_responsavel: formatarNomeProprio(nomeRecebedor),
+                    nome_responsavel: dadosCompletos?.nomeTitular ? formatarNomeProprio(dadosCompletos.nomeTitular) : formatarNomeProprio(nomeRecebedor),
                     cpf: cpfRecebedor ? cpfRecebedor.replace(/\D/g, "") : "",
                     lista_moradores: "" // Limpando dependentes antigas do avulso
                 };

@@ -53,6 +53,7 @@ export default function Encomendas() {
     const [baixaFinalizaCadastro, setBaixaFinalizaCadastro] = useState(false);
     
     // Novos campos para cadastro
+    const [baixaNomeTitular, setBaixaNomeTitular] = useState('');
     const [baixaWhatsapp, setBaixaWhatsapp] = useState('');
     const [baixaCarro, setBaixaCarro] = useState('');
     const [baixaMoto, setBaixaMoto] = useState('');
@@ -236,6 +237,7 @@ export default function Encomendas() {
         setBaixaLoteIds(pacotesDoMesmoApto.map((item: any) => item.id));
         setBaixaTokenInput('');
         setBaixaFinalizaCadastro(false);
+        setBaixaNomeTitular('');
         setBaixaWhatsapp('');
         setBaixaCarro('');
         setBaixaMoto('');
@@ -249,12 +251,13 @@ export default function Encomendas() {
 
         let dadosCompletos = undefined;
         if (baixaFinalizaCadastro) {
-             if (!baixaWhatsapp.trim()) {
-                 alert("O WhatsApp é obrigatório para cadastrar o morador.");
+             if (!baixaNomeTitular.trim() || !baixaWhatsapp.trim()) {
+                 alert("O Nome do Titular e WhatsApp são obrigatórios para cadastrar o morador.");
                  setBaixaProcessando(false);
                  return;
              }
              dadosCompletos = {
+                 nomeTitular: baixaNomeTitular,
                  whatsapp: baixaWhatsapp,
                  carro: baixaCarro,
                  moto: baixaMoto,
@@ -293,12 +296,13 @@ export default function Encomendas() {
 
         let dadosCompletos = undefined;
         if (baixaFinalizaCadastro) {
-             if (!baixaWhatsapp.trim()) {
-                 alert("O WhatsApp é obrigatório para cadastrar o morador.");
+             if (!baixaNomeTitular.trim() || !baixaWhatsapp.trim()) {
+                 alert("O Nome do Titular e WhatsApp são obrigatórios para cadastrar o morador.");
                  setBaixaProcessando(false);
                  return;
              }
              dadosCompletos = {
+                 nomeTitular: baixaNomeTitular,
                  whatsapp: baixaWhatsapp,
                  carro: baixaCarro,
                  moto: baixaMoto,
@@ -334,6 +338,7 @@ export default function Encomendas() {
             setBaixaNomeRecebedor('');
             setBaixaCpfRecebedor('');
             setBaixaFinalizaCadastro(false);
+            setBaixaNomeTitular('');
             setBaixaWhatsapp('');
             setBaixaCarro('');
             setBaixaMoto('');
@@ -353,6 +358,7 @@ export default function Encomendas() {
         );
         // Pre-select all of them for batch baixa
         setBaixaLoteIds(pacotesDoMesmoApto.map((item: any) => item.id));
+        setBaixaNomeTitular('');
     };
 
     const handleToggleBaixaLoteId = (id: string) => {
@@ -761,6 +767,15 @@ export default function Encomendas() {
                                     {baixaFinalizaCadastro && (
                                         <div className="mt-2 space-y-3 pt-3 border-t border-blue-500/30 animate-in fade-in slide-in-from-top-2">
                                             <div className="space-y-1">
+                                                <label className="text-xs font-semibold text-blue-300">Nome do Titular da Unidade *</label>
+                                                <Input
+                                                    value={baixaNomeTitular}
+                                                    onChange={(e) => setBaixaNomeTitular(e.target.value)}
+                                                    placeholder="João da Silva Pereira"
+                                                    className="bg-navy border-blue-500/50 text-white h-8 text-sm"
+                                                />
+                                            </div>
+                                            <div className="space-y-1">
                                                 <label className="text-xs font-semibold text-blue-300">WhatsApp *</label>
                                                 <Input
                                                     value={baixaWhatsapp}
@@ -907,6 +922,15 @@ export default function Encomendas() {
                                     {/* Campos de Cadastro Adicionais */}
                                     {baixaFinalizaCadastro && (
                                         <div className="mt-2 space-y-3 pt-3 border-t border-blue-500/30 animate-in fade-in slide-in-from-top-2">
+                                            <div className="space-y-1">
+                                                <label className="text-xs font-semibold text-blue-300">Nome do Titular da Unidade *</label>
+                                                <Input
+                                                    value={baixaNomeTitular}
+                                                    onChange={(e) => setBaixaNomeTitular(e.target.value)}
+                                                    placeholder="João da Silva Pereira"
+                                                    className="bg-navy border-blue-500/50 text-white h-8 text-sm"
+                                                />
+                                            </div>
                                             <div className="space-y-1">
                                                 <label className="text-xs font-semibold text-blue-300">WhatsApp *</label>
                                                 <Input
