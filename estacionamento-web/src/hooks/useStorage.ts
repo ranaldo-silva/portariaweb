@@ -308,12 +308,14 @@ export const useStorage = () => {
         } catch { return []; }
     }, []);
 
-    const validarTokenRetirada = useCallback(async (tokenId: string, input: string) => {
+    const validarTokenRetirada = useCallback(async (ids: string[], input: string, efetivarCadastro: boolean = false, dadosCompletos: any = null) => {
+        if (!ids || ids.length === 0) return { sucesso: false, msg: "Nenhum pacote selecionado." };
+        const tokenIdPrincipal = ids[0]; // Usamos o primeiro para validar a autorização
         try {
             const { data: enc, error } = await supabase
                 .from('encomendas')
-                .select('*, moradores(cpf)')
-                .eq('id', tokenId)
+                .select('*, moradores(id, cpf)')
+                .eq('id', tokenIdPrincipal)
                 .single();
 
             if (error || !enc) return { sucesso: false, msg: "Encomenda não encontrada!" };
@@ -345,14 +347,42 @@ export const useStorage = () => {
                     status: 'Retirado',
                     data_retirada: new Date().toISOString(),
                     retirado_por: metodoRetirada
-                }).eq('id', tokenId);
+                }).in('id', ids);
+
+            if (!updateError && efetivarCadastro && enc.morador_id) {
+                const updateData: any = {
+                    lista_moradores: "" // Limpando dependentes antigas do avulso
+                };
+                if (inputClean.length === 11) {
+                     updateData.cpf = inputClean;
+                }
+                
+                if (dadosCompletos) {
+                    if (dadosCompletos.whatsapp) updateData.whatsapp = dadosCompletos.whatsapp.replace(/\D/g, "");
+                    if (dadosCompletos.carro) updateData.carro_detalhes = dadosCompletos.carro.toUpperCase();
+                    if (dadosCompletos.moto) updateData.moto_detalhes = dadosCompletos.moto.toUpperCase();
+                    if (dadosCompletos.dependentes) updateData.lista_moradores = formatarNomeProprio(dadosCompletos.dependentes);
+                }
+
+                const { error: moradorUpdateErr } = await supabase
+                    .from('moradores')
+                    .update(updateData)
+                    .eq('id', enc.morador_id);
+
+                if (!moradorUpdateErr) {
+                    await sincronizarMoradores(true);
+                } else {
+                    console.error("Erro ao transpor cadastro rapido:", moradorUpdateErr);
+                }
+            }
+
             return { sucesso: !updateError, msg: updateError ? "Erro ao atualizar banco." : "Retirada confirmada!" };
         } catch (e) {
             return { sucesso: false, msg: "Falha de conexão." };
         }
-    }, []);
+    }, [sincronizarMoradores, formatarNomeProprio]);
 
-    const darBaixaEncomendaPorFoto = useCallback(async (id: string, file: File, nomeRecebedor: string, cpfRecebedor: string = "", efetivarCadastro: boolean = false, moradorId?: any) => {
+    const darBaixaEncomendaPorFoto = useCallback(async (id: string, file: File, nomeRecebedor: string, cpfRecebedor: string = "", efetivarCadastro: boolean = false, moradorId?: any, dadosCompletos?: any) => {
         try {
             // 1. Upload the photo to the new bucket
             const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.jpg`;
@@ -385,13 +415,22 @@ export const useStorage = () => {
 
             // 3. Efetivar cadastro avulso se solicitado
             if (efetivarCadastro && moradorId) {
+                const updateData: any = {
+                    nome_responsavel: formatarNomeProprio(nomeRecebedor),
+                    cpf: cpfRecebedor ? cpfRecebedor.replace(/\D/g, "") : "",
+                    lista_moradores: "" // Limpando dependentes antigas do avulso
+                };
+                
+                if (dadosCompletos) {
+                    if (dadosCompletos.whatsapp) updateData.whatsapp = dadosCompletos.whatsapp.replace(/\D/g, "");
+                    if (dadosCompletos.carro) updateData.carro_detalhes = dadosCompletos.carro.toUpperCase();
+                    if (dadosCompletos.moto) updateData.moto_detalhes = dadosCompletos.moto.toUpperCase();
+                    if (dadosCompletos.dependentes) updateData.lista_moradores = formatarNomeProprio(dadosCompletos.dependentes);
+                }
+
                 const { error: moradorUpdateErr } = await supabase
                     .from('moradores')
-                    .update({
-                        nome_responsavel: formatarNomeProprio(nomeRecebedor),
-                        cpf: cpfRecebedor ? cpfRecebedor.replace(/\D/g, "") : "",
-                        lista_moradores: "" // Limpando dependentes antigas do avulso
-                    })
+                    .update(updateData)
                     .eq('id', moradorId);
 
                 if (!moradorUpdateErr) {

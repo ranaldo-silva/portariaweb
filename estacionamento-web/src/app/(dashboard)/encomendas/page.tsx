@@ -6,16 +6,18 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge'; // Wait, I didn't create Badge, I'll inline styles
-import { Search, Camera, Send, Package, Check, Trash2, FileText, MessageCircle } from 'lucide-react';
+import { Search, Camera, Send, Package, Check, Trash2, FileText } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { generateReportHTML, printHTML, shareReportViaWhatsApp } from '@/lib/print';
+import { generateReportHTML, printHTML } from '@/lib/print';
 import { DetailsModal } from '@/components/DetailsModal';
 import { CameraAutoCapture } from '@/components/CameraAutoCapture';
 import { ReceiptTemplate } from '@/components/ReceiptTemplate';
+import { useRouter } from 'next/navigation';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 
 export default function Encomendas() {
+    const router = useRouter();
     const { getMoradoresBase, registrarEncomenda, registrarEncomendaAvulsa, getEncomendasAtivas, validarTokenRetirada, removerEncomenda, darBaixaEncomendaPorFoto, getTodasEncomendas } = useStorage();
 
     const [busca, setBusca] = useState('');
@@ -49,8 +51,18 @@ export default function Encomendas() {
     const [baixaNomeRecebedor, setBaixaNomeRecebedor] = useState('');
     const [baixaCpfRecebedor, setBaixaCpfRecebedor] = useState('');
     const [baixaFinalizaCadastro, setBaixaFinalizaCadastro] = useState(false);
+    
+    // Novos campos para cadastro
+    const [baixaWhatsapp, setBaixaWhatsapp] = useState('');
+    const [baixaCarro, setBaixaCarro] = useState('');
+    const [baixaMoto, setBaixaMoto] = useState('');
+    const [baixaDependentes, setBaixaDependentes] = useState('');
+
     const [baixaLoteIds, setBaixaLoteIds] = useState<string[]>([]);
     const [baixaProcessando, setBaixaProcessando] = useState(false);
+
+    const [baixaTokenModalItem, setBaixaTokenModalItem] = useState<any>(null);
+    const [baixaTokenInput, setBaixaTokenInput] = useState('');
 
     const origensComuns = ["Shopee", "Mercado Livre", "Shein", "Amazon", "Correios", "99Food", "KeeTa", "Transportadora"];
 
@@ -216,13 +228,51 @@ export default function Encomendas() {
         setFotoFile(null);
     };
 
-    const handleBaixa = async (id: string, tokenReal: string) => {
-        const tokenInput = prompt("Digite o TOKEN ou CPF para retirada:");
-        if (!tokenInput) return;
+    const handleBaixa = (enc: any) => {
+        setBaixaTokenModalItem(enc);
+        const pacotesDoMesmoApto = encomendasPendentes.filter(
+            (item: any) => item.apartamento === enc.apartamento && item.bloco === enc.bloco
+        );
+        setBaixaLoteIds(pacotesDoMesmoApto.map((item: any) => item.id));
+        setBaixaTokenInput('');
+        setBaixaFinalizaCadastro(false);
+        setBaixaWhatsapp('');
+        setBaixaCarro('');
+        setBaixaMoto('');
+        setBaixaDependentes('');
+    };
 
-        const res = await validarTokenRetirada(id, tokenInput);
+    const handleBaixaTokenConfirmar = async () => {
+        if (!baixaTokenModalItem || !baixaTokenInput.trim()) return;
+
+        setBaixaProcessando(true);
+
+        let dadosCompletos = undefined;
+        if (baixaFinalizaCadastro) {
+             if (!baixaWhatsapp.trim()) {
+                 alert("O WhatsApp é obrigatório para cadastrar o morador.");
+                 setBaixaProcessando(false);
+                 return;
+             }
+             dadosCompletos = {
+                 whatsapp: baixaWhatsapp,
+                 carro: baixaCarro,
+                 moto: baixaMoto,
+                 dependentes: baixaDependentes
+             };
+        }
+
+        const idsParaBaixar = baixaLoteIds.length > 0 ? baixaLoteIds : [baixaTokenModalItem.id];
+
+        const res = await validarTokenRetirada(idsParaBaixar, baixaTokenInput, baixaFinalizaCadastro, dadosCompletos);
+        
+        setBaixaProcessando(false);
+
         if (res.sucesso) {
-            alert("Entrega confirmada!");
+            alert(idsParaBaixar.length > 1 ? `Entrega de ${idsParaBaixar.length} pacotes confirmada com sucesso!` : "Entrega confirmada com sucesso!");
+            setBaixaTokenModalItem(null);
+            setBaixaTokenInput('');
+            setBaixaLoteIds([]);
             carregarDados();
         } else {
             alert(res.msg);
@@ -241,6 +291,21 @@ export default function Encomendas() {
 
         setBaixaProcessando(true);
 
+        let dadosCompletos = undefined;
+        if (baixaFinalizaCadastro) {
+             if (!baixaWhatsapp.trim()) {
+                 alert("O WhatsApp é obrigatório para cadastrar o morador.");
+                 setBaixaProcessando(false);
+                 return;
+             }
+             dadosCompletos = {
+                 whatsapp: baixaWhatsapp,
+                 carro: baixaCarro,
+                 moto: baixaMoto,
+                 dependentes: baixaDependentes
+             };
+        }
+
         const idsParaBaixar = baixaLoteIds.length > 0 ? baixaLoteIds : [baixaFotoModalItem.id];
         let sucessoGeral = true;
         let msgErro = "";
@@ -252,7 +317,8 @@ export default function Encomendas() {
                 baixaNomeRecebedor,
                 baixaCpfRecebedor,
                 baixaFinalizaCadastro,
-                baixaFotoModalItem.morador_id
+                baixaFotoModalItem.morador_id,
+                dadosCompletos
             );
             if (!res.sucesso) {
                 sucessoGeral = false;
@@ -268,6 +334,10 @@ export default function Encomendas() {
             setBaixaNomeRecebedor('');
             setBaixaCpfRecebedor('');
             setBaixaFinalizaCadastro(false);
+            setBaixaWhatsapp('');
+            setBaixaCarro('');
+            setBaixaMoto('');
+            setBaixaDependentes('');
             setBaixaLoteIds([]);
             carregarDados();
         } else {
@@ -320,38 +390,24 @@ export default function Encomendas() {
         printHTML(generateReportHTML("Relatório de Encomendas (Entregues)", data));
     };
 
-    const handleWhatsAppRelatorioPendentes = () => {
-        const data = encomendasPendentes.map(e => ({
-            Data: new Date(e.data_chegada).toLocaleDateString(),
-            Chegada: new Date(e.data_chegada).toLocaleTimeString(),
-            Destinatario: e.destinatario || e.moradores?.nome_responsavel,
-            Apartamento: `AP ${e.apartamento} ${e.bloco || ''}`.trim(),
-            Origem: e.origem,
-            Status: e.status,
-            Foto: e.foto_url
-        }));
-        shareReportViaWhatsApp("Relatório de Encomendas (Na Portaria)", data);
-    };
-
-    const handleWhatsAppRelatorioEntregues = async () => {
-        const todas = await getTodasEncomendas();
-        const entregues = todas.filter((e: any) => e.status === 'Entregue');
-        const data = entregues.map((e: any) => ({
-            Data: new Date(e.data_chegada).toLocaleDateString(),
-            Destinatario: e.destinatario || e.moradores?.nome_responsavel,
-            Apartamento: `AP ${e.apartamento} ${e.bloco || ''}`.trim(),
-            Origem: e.origem,
-            Status: e.status,
-            Retirada: e.data_retirada ? new Date(e.data_retirada).toLocaleString() : '-',
-            Retirado_Por: e.retirado_por || '-',
-            Foto: e.foto_url
-        }));
-        shareReportViaWhatsApp("Relatório de Encomendas (Entregues)", data);
-    };
-
     return (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* REGISTRO */}
+        <div className="flex flex-col gap-4">
+            <div className="flex justify-between items-center bg-navy p-3 rounded shadow border border-blue-900/30">
+                <h1 className="text-xl font-bold text-white flex items-center gap-2">
+                    <Package className="text-gold" />
+                    Gestão de Encomendas
+                </h1>
+                <Button 
+                    variant="ghost" 
+                    className="text-gray-400 hover:text-white hover:bg-gray-800"
+                    onClick={() => router.push('/dashboard')}
+                >
+                    ✕ Fechar
+                </Button>
+            </div>
+            
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* REGISTRO */}
             <Card className="bg-navy-light border-gold border h-fit">
                 <CardHeader>
                     <CardTitle className="text-gold flex items-center gap-2"><Package /> Nova Encomenda</CardTitle>
@@ -529,22 +585,12 @@ export default function Encomendas() {
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
                     <h2 className="text-xl font-bold text-white">Na Portaria ({encomendasPendentes.length})</h2>
                     <div className="flex gap-2 flex-wrap items-center">
-                        <div className="flex gap-1">
-                            <Button size="sm" variant="outline" className="border-gold text-gold hover:bg-gold hover:text-navy font-bold rounded-r-none" onClick={handleGerarRelatorioPendentes}>
-                                <FileText size={16} className="md:mr-1" /> <span className="hidden md:inline">PDF Pendentes</span>
-                            </Button>
-                            <Button size="sm" className="bg-green-600 text-white hover:bg-green-700 font-bold rounded-l-none" onClick={handleWhatsAppRelatorioPendentes} title="Enviar Pendentes WhatsApp">
-                                <MessageCircle size={16} />
-                            </Button>
-                        </div>
-                        <div className="flex gap-1">
-                            <Button size="sm" variant="outline" className="border-green-500 text-green-500 hover:bg-green-500 hover:text-white font-bold rounded-r-none" onClick={handleGerarRelatorioEntregues}>
-                                <Check size={16} className="md:mr-1" /> <span className="hidden md:inline">PDF Entregues</span>
-                            </Button>
-                            <Button size="sm" className="bg-green-600 text-white hover:bg-green-700 font-bold rounded-l-none" onClick={handleWhatsAppRelatorioEntregues} title="Enviar Entregues WhatsApp">
-                                <MessageCircle size={16} />
-                            </Button>
-                        </div>
+                        <Button size="sm" variant="outline" className="border-gold text-gold hover:bg-gold hover:text-navy font-bold" onClick={handleGerarRelatorioPendentes}>
+                            <FileText size={16} className="mr-1" /> PDF Pendentes
+                        </Button>
+                        <Button size="sm" variant="outline" className="border-green-500 text-green-500 hover:bg-green-500 hover:text-white font-bold" onClick={handleGerarRelatorioEntregues}>
+                            <Check size={16} className="mr-1" /> PDF Entregues
+                        </Button>
                         <Input placeholder="Filtro AP" className="w-24 bg-navy-light border-gray-600 text-white h-9 text-sm" value={filtroAp} onChange={e => setFiltroAp(e.target.value)} />
                         <Input placeholder="Filtro Bloco" className="w-28 bg-navy-light border-gray-600 text-white h-9 text-sm" value={filtroBloco} onChange={e => setFiltroBloco(e.target.value)} />
                     </div>
@@ -577,7 +623,7 @@ export default function Encomendas() {
                                 </CardContent>
                                 {/* Actions outside onClick to avoid triggering modal */}
                                 <div className="flex flex-col gap-2 p-2 pt-0 z-10 w-full sm:w-auto">
-                                    <Button size="sm" className="bg-blue-600 hover:bg-blue-700 h-8 font-bold w-full" onClick={(e) => { e.stopPropagation(); handleBaixa(enc.id, enc.token); }}>
+                                    <Button size="sm" className="bg-blue-600 hover:bg-blue-700 h-8 font-bold w-full" onClick={(e) => { e.stopPropagation(); handleBaixa(enc); }}>
                                         BAIXA TOKEN/CPF
                                     </Button>
                                     <div className="flex gap-2">
@@ -636,7 +682,7 @@ export default function Encomendas() {
                                 </Button>
                             </CardTitle>
                         </CardHeader>
-                        <CardContent className="pt-4 space-y-4">
+                        <CardContent className="pt-4 space-y-4 max-h-[85vh] overflow-y-auto">
                             <div className="bg-blue-900/20 p-3 rounded text-sm text-blue-200 border border-blue-500/30">
                                 <p><strong>Morador:</strong> {baixaFotoModalItem.moradores?.nome_responsavel}</p>
                                 <p><strong>Unidade:</strong> AP {baixaFotoModalItem.apartamento}</p>
@@ -696,18 +742,64 @@ export default function Encomendas() {
 
                             {/* Opcional: Efetivar Cadastro Avulso */}
                             {baixaFotoModalItem?.moradores?.nome_responsavel === "Pendente Cadastro" && (
-                                <div className="mt-4 p-3 bg-blue-900/30 border border-blue-500/50 rounded flex gap-3 items-start">
-                                    <input
-                                        type="checkbox"
-                                        id="efetivar"
-                                        checked={baixaFinalizaCadastro}
-                                        onChange={(e) => setBaixaFinalizaCadastro(e.target.checked)}
-                                        className="mt-1 w-5 h-5 rounded border-gray-300 text-blue-500 focus:ring-blue-500"
-                                    />
-                                    <label htmlFor="efetivar" className="text-sm text-blue-100 cursor-pointer">
-                                        <span className="font-bold block">Efetivar Morador Desta Unidade?</span>
-                                        Salvar no sistema o NOME e CPF acima como o responsável definitivo da unidade AP {baixaFotoModalItem.apartamento}.
-                                    </label>
+                                <div className="mt-4 p-3 bg-blue-900/30 border border-blue-500/50 rounded flex flex-col gap-3">
+                                    <div className="flex gap-3 items-start">
+                                        <input
+                                            type="checkbox"
+                                            id="efetivar"
+                                            checked={baixaFinalizaCadastro}
+                                            onChange={(e) => setBaixaFinalizaCadastro(e.target.checked)}
+                                            className="mt-1 w-5 h-5 rounded border-gray-300 text-blue-500 focus:ring-blue-500"
+                                        />
+                                        <label htmlFor="efetivar" className="text-sm text-blue-100 cursor-pointer">
+                                            <span className="font-bold block">Efetivar Morador Desta Unidade?</span>
+                                            Salvar o responsável definitivo da unidade AP {baixaFotoModalItem.apartamento}.
+                                        </label>
+                                    </div>
+
+                                    {/* Campos de Cadastro Adicionais */}
+                                    {baixaFinalizaCadastro && (
+                                        <div className="mt-2 space-y-3 pt-3 border-t border-blue-500/30 animate-in fade-in slide-in-from-top-2">
+                                            <div className="space-y-1">
+                                                <label className="text-xs font-semibold text-blue-300">WhatsApp *</label>
+                                                <Input
+                                                    value={baixaWhatsapp}
+                                                    onChange={(e) => setBaixaWhatsapp(e.target.value)}
+                                                    placeholder="(11) 99999-9999"
+                                                    className="bg-navy border-blue-500/50 text-white h-8 text-sm"
+                                                />
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-2">
+                                                <div className="space-y-1">
+                                                    <label className="text-xs font-semibold text-blue-300">Carro</label>
+                                                    <Input
+                                                        value={baixaCarro}
+                                                        onChange={(e) => setBaixaCarro(e.target.value)}
+                                                        placeholder="Modelo/Placa"
+                                                        className="bg-navy border-blue-500/50 text-white h-8 text-sm uppercase"
+                                                    />
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <label className="text-xs font-semibold text-blue-300">Moto</label>
+                                                    <Input
+                                                        value={baixaMoto}
+                                                        onChange={(e) => setBaixaMoto(e.target.value)}
+                                                        placeholder="Modelo/Placa"
+                                                        className="bg-navy border-blue-500/50 text-white h-8 text-sm uppercase"
+                                                    />
+                                                </div>
+                                            </div>
+                                            <div className="space-y-1">
+                                                <label className="text-xs font-semibold text-blue-300">Dependentes (Opcional)</label>
+                                                <textarea
+                                                    value={baixaDependentes}
+                                                    onChange={(e) => setBaixaDependentes(e.target.value)}
+                                                    placeholder="Maria, João..."
+                                                    className="w-full bg-navy border border-blue-500/50 text-white rounded p-2 text-sm min-h-[60px]"
+                                                />
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             )}
 
@@ -733,12 +825,152 @@ export default function Encomendas() {
                 </div>
             )}
 
+            {/* Modal para Baixa por Token/CPF */}
+            {baixaTokenModalItem && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+                    <Card className="w-full max-w-sm bg-navy border-blue-500 shadow-2xl animate-in fade-in zoom-in duration-200">
+                        <CardHeader className="pb-3 border-b border-gray-700">
+                            <CardTitle className="text-xl font-bold text-white flex justify-between items-center">
+                                Baixa por Token ou CPF
+                                <Button variant="ghost" size="icon" onClick={() => setBaixaTokenModalItem(null)} className="h-8 w-8 text-gray-400 hover:text-white">
+                                    ✕
+                                </Button>
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="pt-4 space-y-4 max-h-[85vh] overflow-y-auto">
+                            <div className="bg-blue-900/20 p-3 rounded text-sm text-blue-200 border border-blue-500/30">
+                                <p><strong>Morador:</strong> {baixaTokenModalItem.moradores?.nome_responsavel}</p>
+                                <p><strong>Unidade:</strong> AP {baixaTokenModalItem.apartamento}</p>
+                            </div>
+
+                            {/* Lotes Encontrados */}
+                            {encomendasPendentes.filter((item: any) => item.apartamento === baixaTokenModalItem.apartamento && item.bloco === baixaTokenModalItem.bloco).length > 1 && (
+                                <div className="bg-yellow-900/20 p-3 rounded border border-yellow-600/50">
+                                    <p className="text-sm text-yellow-500 font-bold mb-2">
+                                        Entregar {encomendasPendentes.filter((item: any) => item.apartamento === baixaTokenModalItem.apartamento && item.bloco === baixaTokenModalItem.bloco).length} pacotes pendentes?
+                                    </p>
+                                    <div className="space-y-2 max-h-32 overflow-y-auto pr-1">
+                                        {encomendasPendentes
+                                            .filter((item: any) => item.apartamento === baixaTokenModalItem.apartamento && item.bloco === baixaTokenModalItem.bloco)
+                                            .map((enc: any) => (
+                                                <label key={enc.id} className="flex items-center gap-2 cursor-pointer p-1.5 hover:bg-navy rounded">
+                                                    <input
+                                                        type="checkbox"
+                                                        className="w-4 h-4 text-gold rounded border-gray-500 focus:ring-gold focus:ring-opacity-25"
+                                                        checked={baixaLoteIds.includes(enc.id)}
+                                                        onChange={(e) => {
+                                                            if (e.target.checked) {
+                                                                setBaixaLoteIds(prev => [...prev, enc.id]);
+                                                            } else {
+                                                                setBaixaLoteIds(prev => prev.filter(id => id !== enc.id));
+                                                            }
+                                                        }}
+                                                    />
+                                                    <div className="flex flex-col">
+                                                        <span className="text-xs text-white">{enc.origem} - {enc.nome_destinatario}</span>
+                                                        <span className="text-[10px] text-gray-400">{new Date(enc.data_chegada).toLocaleString('pt-BR')}</span>
+                                                    </div>
+                                                </label>
+                                            ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            <div className="space-y-2">
+                                <label className="text-sm font-semibold text-white">Digite o TOKEN ou CPF para retirada:</label>
+                                <Input
+                                    value={baixaTokenInput}
+                                    onChange={(e) => setBaixaTokenInput(e.target.value)}
+                                    placeholder="Ex: 1234 ou 000.000.000-00"
+                                    className="bg-navy-light text-white border-gray-600 focus:border-blue-500 rounded"
+                                    autoFocus
+                                />
+                            </div>
+
+                            {/* Opcional: Efetivar Cadastro Avulso */}
+                            {baixaTokenModalItem?.moradores?.nome_responsavel === "Pendente Cadastro" && (
+                                <div className="mt-4 p-3 bg-blue-900/30 border border-blue-500/50 rounded flex flex-col gap-3">
+                                    <div className="flex gap-3 items-start">
+                                        <input
+                                            type="checkbox"
+                                            id="efetivarToken"
+                                            checked={baixaFinalizaCadastro}
+                                            onChange={(e) => setBaixaFinalizaCadastro(e.target.checked)}
+                                            className="mt-1 w-5 h-5 rounded border-gray-300 text-blue-500 focus:ring-blue-500"
+                                        />
+                                        <label htmlFor="efetivarToken" className="text-sm text-blue-100 cursor-pointer">
+                                            <span className="font-bold block">Efetivar Morador Desta Unidade?</span>
+                                            Salvar o responsável definitivo da unidade AP {baixaTokenModalItem.apartamento}.
+                                        </label>
+                                    </div>
+
+                                    {/* Campos de Cadastro Adicionais */}
+                                    {baixaFinalizaCadastro && (
+                                        <div className="mt-2 space-y-3 pt-3 border-t border-blue-500/30 animate-in fade-in slide-in-from-top-2">
+                                            <div className="space-y-1">
+                                                <label className="text-xs font-semibold text-blue-300">WhatsApp *</label>
+                                                <Input
+                                                    value={baixaWhatsapp}
+                                                    onChange={(e) => setBaixaWhatsapp(e.target.value)}
+                                                    placeholder="(11) 99999-9999"
+                                                    className="bg-navy border-blue-500/50 text-white h-8 text-sm"
+                                                />
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-2">
+                                                <div className="space-y-1">
+                                                    <label className="text-xs font-semibold text-blue-300">Carro</label>
+                                                    <Input
+                                                        value={baixaCarro}
+                                                        onChange={(e) => setBaixaCarro(e.target.value)}
+                                                        placeholder="Modelo/Placa"
+                                                        className="bg-navy border-blue-500/50 text-white h-8 text-sm uppercase"
+                                                    />
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <label className="text-xs font-semibold text-blue-300">Moto</label>
+                                                    <Input
+                                                        value={baixaMoto}
+                                                        onChange={(e) => setBaixaMoto(e.target.value)}
+                                                        placeholder="Modelo/Placa"
+                                                        className="bg-navy border-blue-500/50 text-white h-8 text-sm uppercase"
+                                                    />
+                                                </div>
+                                            </div>
+                                            <div className="space-y-1">
+                                                <label className="text-xs font-semibold text-blue-300">Dependentes (Opcional)</label>
+                                                <textarea
+                                                    value={baixaDependentes}
+                                                    onChange={(e) => setBaixaDependentes(e.target.value)}
+                                                    placeholder="Maria, João..."
+                                                    className="w-full bg-navy border border-blue-500/50 text-white rounded p-2 text-sm min-h-[60px]"
+                                                />
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            <div className="pt-2">
+                                <Button
+                                    onClick={handleBaixaTokenConfirmar}
+                                    disabled={baixaProcessando || !baixaTokenInput.trim()}
+                                    className={`w-full h-12 text-sm font-bold shadow-lg ${baixaProcessando ? 'bg-gray-600' : 'bg-blue-600 hover:bg-blue-500 text-white'}`}
+                                >
+                                    {baixaProcessando ? 'PROCESSANDO...' : 'CONFIRMAR RETIRADA'}
+                                </Button>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </div>
+            )}
+
             {/* Hidden Receipt Template for PDF generation */}
             <ReceiptTemplate
                 ref={receiptRef}
                 encomenda={reciboGerado}
                 condominioName="Portaria Web"
             />
-        </div >
+            </div>
+        </div>
     );
 }
