@@ -24,6 +24,13 @@ export function ConsultaMotosModal({ onClose }: ConsultaMotosModalProps) {
     const [loading, setLoading] = useState(true);
     const [processingId, setProcessingId] = useState<number | null>(null);
 
+    // New Flow State
+    const [step, setStep] = useState<1 | 2>(1);
+    const [inAp, setInAp] = useState('');
+    const [inBloco, setInBloco] = useState('');
+    const [inPlaca, setInPlaca] = useState('');
+    const [inNomeDono, setInNomeDono] = useState('');
+
     useEffect(() => {
         loadData();
     }, []);
@@ -57,10 +64,64 @@ export function ConsultaMotosModal({ onClose }: ConsultaMotosModalProps) {
 
     const handleTabChange = async (tab: 'lista' | 'historico') => {
         setActiveTab(tab);
+        if (tab === 'lista') {
+            setStep(1); // Reset to step 1 when going back to lista
+        }
         if (tab === 'historico') {
             const hist = await getHistoricoMotos();
             setHistorico(hist);
         }
+    };
+
+    const handleSearchClick = () => {
+        if (!inAp) {
+            alert('Por favor, informe o Apartamento.');
+            return;
+        }
+
+        // Filter based on input
+        const filtered = motos.filter(m => {
+            const matchAp = String(m.apartamento) === inAp.trim();
+            const matchBloco = inBloco.trim() === '' || (m.bloco || '').toLowerCase() === inBloco.trim().toLowerCase();
+            return matchAp && matchBloco;
+        });
+
+        setFilteredMotos(filtered);
+        setStep(2);
+    };
+
+    const handleCaptureNovo = async (file: File | null) => {
+        if (!inPlaca.trim()) {
+            alert('A placa da moto é obrigatória para registrar um pendente.');
+            return;
+        }
+        if (!inNomeDono.trim()) {
+            alert('O nome do dono da moto é obrigatório para registrar um pendente.');
+            return;
+        }
+
+        setProcessingId(-1); // Special ID for "Novo"
+        const success = await registrarEntradaMoto({
+            morador_nome: "Pendente de Cadastro",
+            apartamento: inAp.trim(),
+            bloco: inBloco.trim().toUpperCase(),
+            moto_detalhes: inPlaca.trim() ? `DESCONHECIDA | ${inPlaca.trim().toUpperCase()}` : "Moto Desconhecida",
+            fotoFile: file,
+            isPendente: true,
+            novoNomeDono: inNomeDono.trim()
+        });
+
+        if (success) {
+            alert('Entrada da moto registrada como Pendente!');
+            setStep(1);
+            setInAp('');
+            setInBloco('');
+            setInPlaca('');
+            setInNomeDono('');
+        } else {
+            alert('Erro ao registrar entrada da moto.');
+        }
+        setProcessingId(null);
     };
 
     const handleCapture = async (file: File | null, morador: any) => {
@@ -151,57 +212,150 @@ export function ConsultaMotosModal({ onClose }: ConsultaMotosModalProps) {
                         <>
                             {activeTab === 'lista' && (
                                 <div className="space-y-4">
-                                    <div className="sticky top-0 z-10 bg-navy pb-2 relative">
-                                        <Search className="absolute left-3 top-3 text-gray-400" size={20} />
-                                        <Input
-                                            placeholder="Buscar por morador, moto, ap ou bloco..."
-                                            className="pl-10 bg-navy-light border-gray-600 text-white placeholder-gray-400 focus:border-gold w-full"
-                                            value={searchTerm}
-                                            onChange={(e) => setSearchTerm(e.target.value)}
-                                        />
-                                    </div>
+                                    {step === 1 ? (
+                                        <div className="bg-navy-light border border-gold/40 p-6 rounded-xl shadow-lg animate-in fade-in slide-in-from-bottom-4">
+                                            <h3 className="text-xl text-gold font-bold mb-4 text-center">Identificação da Moto</h3>
+                                            <p className="text-gray-400 text-sm text-center mb-6">Por favor, questione o condutor sobre o seu destino antes de abrir o portão.</p>
 
-                                    {filteredMotos.length === 0 ? (
-                                        <div className="text-center py-10 text-gray-400 bg-navy-light/30 rounded-lg border border-dashed border-gray-700">
-                                            <p>Nenhuma moto encontrada.</p>
+                                            <div className="space-y-4 max-w-sm mx-auto">
+                                                <div className="space-y-2">
+                                                    <label className="text-sm text-gold font-bold">Unidade (AP) <span className="text-red-500">*</span></label>
+                                                    <Input
+                                                        placeholder="Ex: 101"
+                                                        className="bg-navy border-gray-600 focus:border-gold text-white"
+                                                        value={inAp}
+                                                        onChange={(e) => setInAp(e.target.value)}
+                                                        type="number"
+                                                    />
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <label className="text-sm text-gold font-bold">Bloco (Opcional se não houver)</label>
+                                                    <Input
+                                                        placeholder="Ex: A"
+                                                        className="bg-navy border-gray-600 focus:border-gold text-white uppercase"
+                                                        value={inBloco}
+                                                        onChange={(e) => setInBloco(e.target.value)}
+                                                    />
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <label className="text-sm text-gold font-bold">Placa da Moto <span className="text-red-500">*</span></label>
+                                                    <Input
+                                                        placeholder="Ex: ABC-1234"
+                                                        className="bg-navy border-gray-600 focus:border-gold text-white uppercase"
+                                                        value={inPlaca}
+                                                        onChange={(e) => setInPlaca(e.target.value)}
+                                                    />
+                                                </div>
+
+                                                <Button
+                                                    onClick={handleSearchClick}
+                                                    className="w-full bg-gold hover:bg-gold-hover text-navy font-bold mt-4"
+                                                    size="lg"
+                                                >
+                                                    <Search size={18} className="mr-2" /> Avançar
+                                                </Button>
+                                            </div>
                                         </div>
                                     ) : (
-                                        <div className="grid gap-3">
-                                            {filteredMotos.map((m) => (
-                                                <div key={m.id} className="bg-navy-light border border-gray-700 p-4 rounded-xl flex flex-col sm:flex-row items-start sm:items-center gap-4 hover:border-gold/50 transition-colors">
-                                                    <div className="space-y-1 overflow-hidden flex-1 w-full">
-                                                        <p className="font-bold text-white leading-tight truncate text-base sm:text-lg">{m.nome_responsavel}</p>
-                                                        <div className="flex flex-col items-start gap-1">
-                                                            <span className="bg-gray-800 px-2 py-0.5 rounded text-gold font-mono text-xs">{m.apartamento}-{m.bloco}</span>
-                                                            {formatMotoLabel(m.moto_detalhes)}
-                                                        </div>
+                                        <div className="animate-in fade-in">
+                                            <button
+                                                onClick={() => setStep(1)}
+                                                className="mb-4 text-gray-400 hover:text-white flex items-center gap-1 text-sm font-bold bg-white/5 py-1 px-3 rounded-full"
+                                            >
+                                                ← Voltar para Busca
+                                            </button>
+
+                                            <h3 className="text-lg text-white font-bold mb-3">
+                                                Resultado para AP {inAp} {inBloco ? `- Bloco ${inBloco}` : ''}
+                                            </h3>
+
+                                            {filteredMotos.length === 0 ? (
+                                                <div className="bg-red-900/20 border border-red-500/50 rounded-xl p-6 text-center space-y-4">
+                                                    <div className="text-red-400 font-bold text-lg">⚠️ Nenhuma moto cadastrada para esta unidade.</div>
+                                                    <p className="text-gray-300 text-sm">Se tiver certeza da entrada, preencha o nome do condutor e registre com foto. A moto será vinculada à unidade.</p>
+
+                                                    <div className="space-y-2 mt-4 text-left">
+                                                        <label className="text-sm text-gold font-bold">Nome do Condutor da Moto <span className="text-red-500">*</span></label>
+                                                        <Input
+                                                            placeholder="Ex: João Silva"
+                                                            className="bg-navy-light text-white border-gray-600 focus:border-gold"
+                                                            value={inNomeDono}
+                                                            onChange={(e) => setInNomeDono(e.target.value)}
+                                                        />
                                                     </div>
 
-                                                    <div className="shrink-0 w-full sm:w-auto flex flex-col sm:flex-row gap-2">
-                                                        <Button
-                                                            variant="outline"
-                                                            disabled={processingId === m.id}
-                                                            onClick={(e) => { e.stopPropagation(); handleCapture(null, m); }}
-                                                            className="w-full sm:w-auto border-gold/50 text-gold hover:bg-gold/10 font-bold"
-                                                        >
-                                                            Sem Foto
-                                                        </Button>
-                                                        <CameraAutoCapture onCapture={(file) => handleCapture(file, m)}>
+                                                    <div className="flex justify-center flex-col sm:flex-row gap-3 mt-4">
+                                                        <CameraAutoCapture onCapture={handleCaptureNovo}>
                                                             <Button
-                                                                disabled={processingId === m.id}
-                                                                className={`w-full sm:w-auto ${processingId === m.id ? 'bg-gray-600' : 'bg-gold hover:bg-gold-hover text-navy font-bold'}`}
+                                                                disabled={processingId === -1 || !inPlaca.trim() || !inNomeDono.trim()}
+                                                                className={`w-full sm:w-auto ${processingId === -1 ? 'bg-gray-600' : 'bg-red-600 hover:bg-red-700 text-white font-bold'}`}
                                                             >
-                                                                {processingId === m.id ? 'Salvando...' : (
+                                                                {processingId === -1 ? 'Salvando...' : (
                                                                     <>
                                                                         <Camera size={18} className="mr-2" />
-                                                                        Validar
+                                                                        Registrar Pendente c/ Foto
                                                                     </>
                                                                 )}
                                                             </Button>
                                                         </CameraAutoCapture>
                                                     </div>
                                                 </div>
-                                            ))}
+                                            ) : (
+                                                <div className="grid gap-3">
+                                                    {filteredMotos.map((m) => (
+                                                        <div key={m.id} className="bg-navy-light border border-green-500/30 p-4 rounded-xl flex flex-col sm:flex-row items-start sm:items-center gap-4 hover:border-green-500 transition-colors">
+                                                            <div className="space-y-1 overflow-hidden flex-1 w-full">
+                                                                <div className="flex items-center gap-2">
+                                                                    <CheckCircle size={16} className="text-green-500" />
+                                                                    <p className="font-bold text-white leading-tight truncate text-base sm:text-lg">{m.nome_responsavel}</p>
+                                                                </div>
+                                                                <div className="flex flex-col items-start gap-1 ml-6">
+                                                                    <span className="bg-gray-800 px-2 py-0.5 rounded text-gold font-mono text-xs">{m.apartamento}-{m.bloco}</span>
+                                                                    {formatMotoLabel(m.moto_detalhes)}
+                                                                </div>
+                                                            </div>
+
+                                                            <div className="shrink-0 w-full sm:w-auto flex flex-col sm:flex-row gap-2">
+                                                                <Button
+                                                                    variant="outline"
+                                                                    disabled={processingId === m.id}
+                                                                    onClick={(e) => { e.stopPropagation(); handleCapture(null, m); }}
+                                                                    className="w-full sm:w-auto border-gold/50 text-gold hover:bg-gold/10 font-bold"
+                                                                >
+                                                                    Entrada S/ Foto
+                                                                </Button>
+                                                                <CameraAutoCapture onCapture={(file) => handleCapture(file, m)}>
+                                                                    <Button
+                                                                        disabled={processingId === m.id}
+                                                                        className={`w-full sm:w-auto ${processingId === m.id ? 'bg-gray-600' : 'bg-gold hover:bg-gold-hover text-navy font-bold'}`}
+                                                                    >
+                                                                        {processingId === m.id ? 'Salvando...' : (
+                                                                            <>
+                                                                                <Camera size={18} className="mr-2" />
+                                                                                Validar Moto
+                                                                            </>
+                                                                        )}
+                                                                    </Button>
+                                                                </CameraAutoCapture>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+
+                                                    <div className="mt-6 pt-6 border-t border-gray-700 text-center space-y-3">
+                                                        <p className="text-sm text-gray-400">A moto é diferente ou de um visitante?</p>
+                                                        <CameraAutoCapture onCapture={handleCaptureNovo}>
+                                                            <Button
+                                                                disabled={processingId === -1}
+                                                                variant="outline"
+                                                                className="border-gray-500 text-gray-300 hover:bg-white/5 text-sm h-8"
+                                                            >
+                                                                <Camera size={14} className="mr-2" />
+                                                                Registrar como Pendente
+                                                            </Button>
+                                                        </CameraAutoCapture>
+                                                    </div>
+                                                </div>
+                                            )}
                                         </div>
                                     )}
                                 </div>

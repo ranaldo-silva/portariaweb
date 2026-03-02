@@ -51,7 +51,7 @@ export default function Encomendas() {
     const [baixaNomeRecebedor, setBaixaNomeRecebedor] = useState('');
     const [baixaCpfRecebedor, setBaixaCpfRecebedor] = useState('');
     const [baixaFinalizaCadastro, setBaixaFinalizaCadastro] = useState(false);
-    
+
     // Novos campos para cadastro
     const [baixaNomeTitular, setBaixaNomeTitular] = useState('');
     const [baixaWhatsapp, setBaixaWhatsapp] = useState('');
@@ -61,6 +61,11 @@ export default function Encomendas() {
 
     const [baixaLoteIds, setBaixaLoteIds] = useState<string[]>([]);
     const [baixaProcessando, setBaixaProcessando] = useState(false);
+
+    const [dataFiltroEntregues, setDataFiltroEntregues] = useState(() => {
+        const today = new Date();
+        return today.toISOString().split('T')[0];
+    });
 
     const [baixaTokenModalItem, setBaixaTokenModalItem] = useState<any>(null);
     const [baixaTokenInput, setBaixaTokenInput] = useState('');
@@ -236,6 +241,7 @@ export default function Encomendas() {
         );
         setBaixaLoteIds(pacotesDoMesmoApto.map((item: any) => item.id));
         setBaixaTokenInput('');
+        setBaixaNomeRecebedor('');
         setBaixaFinalizaCadastro(false);
         setBaixaNomeTitular('');
         setBaixaWhatsapp('');
@@ -246,35 +252,40 @@ export default function Encomendas() {
 
     const handleBaixaTokenConfirmar = async () => {
         if (!baixaTokenModalItem || !baixaTokenInput.trim()) return;
+        if (!baixaNomeRecebedor.trim()) {
+            alert("Por favor, digite o nome de quem está retirando a encomenda.");
+            return;
+        }
 
         setBaixaProcessando(true);
 
         let dadosCompletos = undefined;
         if (baixaFinalizaCadastro) {
-             if (!baixaNomeTitular.trim() || !baixaWhatsapp.trim()) {
-                 alert("O Nome do Titular e WhatsApp são obrigatórios para cadastrar o morador.");
-                 setBaixaProcessando(false);
-                 return;
-             }
-             dadosCompletos = {
-                 nomeTitular: baixaNomeTitular,
-                 whatsapp: baixaWhatsapp,
-                 carro: baixaCarro,
-                 moto: baixaMoto,
-                 dependentes: baixaDependentes
-             };
+            if (!baixaNomeTitular.trim() || !baixaWhatsapp.trim()) {
+                alert("O Nome do Titular e WhatsApp são obrigatórios para cadastrar o morador.");
+                setBaixaProcessando(false);
+                return;
+            }
+            dadosCompletos = {
+                nomeTitular: baixaNomeTitular,
+                whatsapp: baixaWhatsapp,
+                carro: baixaCarro,
+                moto: baixaMoto,
+                dependentes: baixaDependentes
+            };
         }
 
         const idsParaBaixar = baixaLoteIds.length > 0 ? baixaLoteIds : [baixaTokenModalItem.id];
 
-        const res = await validarTokenRetirada(idsParaBaixar, baixaTokenInput, baixaFinalizaCadastro, dadosCompletos);
-        
+        const res = await validarTokenRetirada(idsParaBaixar, baixaTokenInput, baixaFinalizaCadastro, dadosCompletos, baixaNomeRecebedor);
+
         setBaixaProcessando(false);
 
         if (res.sucesso) {
             alert(idsParaBaixar.length > 1 ? `Entrega de ${idsParaBaixar.length} pacotes confirmada com sucesso!` : "Entrega confirmada com sucesso!");
             setBaixaTokenModalItem(null);
             setBaixaTokenInput('');
+            setBaixaNomeRecebedor('');
             setBaixaLoteIds([]);
             carregarDados();
         } else {
@@ -296,18 +307,18 @@ export default function Encomendas() {
 
         let dadosCompletos = undefined;
         if (baixaFinalizaCadastro) {
-             if (!baixaNomeTitular.trim() || !baixaWhatsapp.trim()) {
-                 alert("O Nome do Titular e WhatsApp são obrigatórios para cadastrar o morador.");
-                 setBaixaProcessando(false);
-                 return;
-             }
-             dadosCompletos = {
-                 nomeTitular: baixaNomeTitular,
-                 whatsapp: baixaWhatsapp,
-                 carro: baixaCarro,
-                 moto: baixaMoto,
-                 dependentes: baixaDependentes
-             };
+            if (!baixaNomeTitular.trim() || !baixaWhatsapp.trim()) {
+                alert("O Nome do Titular e WhatsApp são obrigatórios para cadastrar o morador.");
+                setBaixaProcessando(false);
+                return;
+            }
+            dadosCompletos = {
+                nomeTitular: baixaNomeTitular,
+                whatsapp: baixaWhatsapp,
+                carro: baixaCarro,
+                moto: baixaMoto,
+                dependentes: baixaDependentes
+            };
         }
 
         const idsParaBaixar = baixaLoteIds.length > 0 ? baixaLoteIds : [baixaFotoModalItem.id];
@@ -382,7 +393,24 @@ export default function Encomendas() {
 
     const handleGerarRelatorioEntregues = async () => {
         const todas = await getTodasEncomendas();
-        const entregues = todas.filter((e: any) => e.status === 'Entregue');
+        const entregues = todas.filter((e: any) => {
+            if (e.status !== 'Retirado') return false;
+            if (!dataFiltroEntregues) return true;
+
+            if (!e.data_retirada) return false;
+
+            // Extract YYYY-MM-DD from the record's date considering local timezone
+            const recordDateObj = new Date(e.data_retirada);
+            const recordDateStr = recordDateObj.toLocaleDateString('sv-SE'); // 'sv-SE' format is YYYY-MM-DD
+
+            return recordDateStr === dataFiltroEntregues;
+        });
+
+        if (entregues.length === 0) {
+            alert(`Nenhuma encomenda encontrada como retirada na data: ${new Date(dataFiltroEntregues + 'T12:00:00').toLocaleDateString('pt-BR')}`);
+            return;
+        }
+
         const data = entregues.map((e: any) => ({
             Data: new Date(e.data_chegada).toLocaleDateString(),
             Destinatario: e.destinatario || e.moradores?.nome_responsavel,
@@ -403,597 +431,615 @@ export default function Encomendas() {
                     <Package className="text-gold" />
                     Gestão de Encomendas
                 </h1>
-                <Button 
-                    variant="ghost" 
+                <Button
+                    variant="ghost"
                     className="text-gray-400 hover:text-white hover:bg-gray-800"
                     onClick={() => router.push('/dashboard')}
                 >
                     ✕ Fechar
                 </Button>
             </div>
-            
+
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {/* REGISTRO */}
-            <Card className="bg-navy-light border-gold border h-fit">
-                <CardHeader>
-                    <CardTitle className="text-gold flex items-center gap-2"><Package /> Nova Encomenda</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                    {/* Busca Morador */}
-                    <div className="relative">
-                        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
-                        <Input
-                            placeholder="Buscar Morador ou AP..."
-                            value={busca}
-                            onChange={(e) => setBusca(e.target.value)}
-                            className="pl-9 bg-white text-black"
-                        />
-                        {busca.length > 0 && !moradorSel && (
-                            <div className="absolute z-10 w-full bg-white border mt-1 rounded shadow-lg max-h-56 overflow-y-auto">
-                                {moradores
-                                    .filter(m => String(m.nome_responsavel || "").toLowerCase().includes(busca.toLowerCase()) || String(m.apartamento).includes(busca))
-                                    .slice(0, 5)
-                                    .map(m => (
-                                        <div
-                                            key={m.id}
-                                            className="p-2 hover:bg-gray-100 cursor-pointer text-black border-b"
-                                            onClick={() => { setMoradorSel(m); setDestinatarioFinal(m.nome_responsavel); setBusca(m.nome_responsavel); setMostrarAvulso(false); }}
+                <Card className="bg-navy-light border-gold border h-fit">
+                    <CardHeader>
+                        <CardTitle className="text-gold flex items-center gap-2"><Package /> Nova Encomenda</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        {/* Busca Morador */}
+                        <div className="relative">
+                            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
+                            <Input
+                                placeholder="Buscar Morador ou AP..."
+                                value={busca}
+                                onChange={(e) => setBusca(e.target.value)}
+                                className="pl-9 bg-white text-black"
+                            />
+                            {busca.length > 0 && !moradorSel && (
+                                <div className="absolute z-10 w-full bg-white border mt-1 rounded shadow-lg max-h-56 overflow-y-auto">
+                                    {moradores
+                                        .filter(m => String(m.nome_responsavel || "").toLowerCase().includes(busca.toLowerCase()) || String(m.apartamento).includes(busca))
+                                        .slice(0, 5)
+                                        .map(m => (
+                                            <div
+                                                key={m.id}
+                                                className="p-2 hover:bg-gray-100 cursor-pointer text-black border-b"
+                                                onClick={() => { setMoradorSel(m); setDestinatarioFinal(m.nome_responsavel); setBusca(m.nome_responsavel); setMostrarAvulso(false); }}
+                                            >
+                                                <strong>{m.nome_responsavel}</strong>
+                                                <div className="text-xs text-gray-500">AP: {m.apartamento} {m.bloco}</div>
+                                            </div>
+                                        ))}
+                                    <div
+                                        className="p-3 hover:bg-blue-100 cursor-pointer text-blue-700 text-sm font-bold text-center bg-blue-50"
+                                        onClick={() => { setMostrarAvulso(true); setBusca(''); }}
+                                    >
+                                        + Registrar Unidade/Morador Avulso
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Avulso Inputs */}
+                        {mostrarAvulso && !moradorSel && (
+                            <div className="bg-navy p-4 rounded border border-blue-500/50 mt-2 space-y-3 shadow-inner">
+                                <p className="text-sm border-b pb-1 text-blue-400 font-bold border-blue-900 mb-2">Registro Avulso (Morador Não Cadastrado)</p>
+                                <div className="grid grid-cols-2 gap-2">
+                                    <div>
+                                        <label className="text-xs text-gray-400">Apartamento *</label>
+                                        <Input placeholder="Ex: 101" value={novoAp} onChange={(e) => setNovoAp(e.target.value)} className="bg-navy-light text-white" />
+                                    </div>
+                                    <div>
+                                        <label className="text-xs text-gray-400">Bloco (Opcional)</label>
+                                        <Input placeholder="Ex: A" value={novoBloco} onChange={(e) => setNovoBloco(e.target.value)} className="bg-navy-light text-white" />
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="text-xs text-gray-400">Nome do Destinatário *</label>
+                                    <Input placeholder="Nome na Etiqueta" value={destinatarioFinal} onChange={(e) => setDestinatarioFinal(e.target.value)} className="bg-navy-light text-white" />
+                                </div>
+                                <Button size="sm" variant="ghost" className="w-full text-red-400 hover:text-red-300 hover:bg-red-400/10" onClick={() => setMostrarAvulso(false)}>Cancelar Avulso</Button>
+                            </div>
+                        )}
+
+                        {/* Detalhes do Morador */}
+                        {moradorSel && (
+                            <div className="bg-navy p-3 rounded border border-gold/30">
+                                <p className="text-sm text-gray-300 mb-2">Quem vai retirar?</p>
+                                <div className="flex flex-wrap gap-2">
+                                    <Button
+                                        size="sm"
+                                        variant={destinatarioFinal === moradorSel.nome_responsavel ? "default" : "secondary"}
+                                        onClick={() => setDestinatarioFinal(moradorSel.nome_responsavel)}
+                                    >
+                                        {moradorSel.nome_responsavel} (Titular)
+                                    </Button>
+                                    {/* @ts-ignore */}
+                                    {obterMoradoresUnicos(moradorSel).map((dep: any) => (
+                                        <Button
+                                            key={dep}
+                                            size="sm"
+                                            variant={destinatarioFinal === dep ? "default" : "secondary"}
+                                            onClick={() => setDestinatarioFinal(dep)}
                                         >
-                                            <strong>{m.nome_responsavel}</strong>
-                                            <div className="text-xs text-gray-500">AP: {m.apartamento} {m.bloco}</div>
-                                        </div>
+                                            {dep}
+                                        </Button>
                                     ))}
-                                <div
-                                    className="p-3 hover:bg-blue-100 cursor-pointer text-blue-700 text-sm font-bold text-center bg-blue-50"
-                                    onClick={() => { setMostrarAvulso(true); setBusca(''); }}
-                                >
-                                    + Registrar Unidade/Morador Avulso
                                 </div>
                             </div>
                         )}
-                    </div>
 
-                    {/* Avulso Inputs */}
-                    {mostrarAvulso && !moradorSel && (
-                        <div className="bg-navy p-4 rounded border border-blue-500/50 mt-2 space-y-3 shadow-inner">
-                            <p className="text-sm border-b pb-1 text-blue-400 font-bold border-blue-900 mb-2">Registro Avulso (Morador Não Cadastrado)</p>
-                            <div className="grid grid-cols-2 gap-2">
-                                <div>
-                                    <label className="text-xs text-gray-400">Apartamento *</label>
-                                    <Input placeholder="Ex: 101" value={novoAp} onChange={(e) => setNovoAp(e.target.value)} className="bg-navy-light text-white" />
-                                </div>
-                                <div>
-                                    <label className="text-xs text-gray-400">Bloco (Opcional)</label>
-                                    <Input placeholder="Ex: A" value={novoBloco} onChange={(e) => setNovoBloco(e.target.value)} className="bg-navy-light text-white" />
-                                </div>
-                            </div>
-                            <div>
-                                <label className="text-xs text-gray-400">Nome do Destinatário *</label>
-                                <Input placeholder="Nome na Etiqueta" value={destinatarioFinal} onChange={(e) => setDestinatarioFinal(e.target.value)} className="bg-navy-light text-white" />
-                            </div>
-                            <Button size="sm" variant="ghost" className="w-full text-red-400 hover:text-red-300 hover:bg-red-400/10" onClick={() => setMostrarAvulso(false)}>Cancelar Avulso</Button>
-                        </div>
-                    )}
-
-                    {/* Detalhes do Morador */}
-                    {moradorSel && (
-                        <div className="bg-navy p-3 rounded border border-gold/30">
-                            <p className="text-sm text-gray-300 mb-2">Quem vai retirar?</p>
+                        {/* Origem */}
+                        <div>
+                            <p className="text-sm text-gray-300 mb-2">Origem:</p>
                             <div className="flex flex-wrap gap-2">
-                                <Button
-                                    size="sm"
-                                    variant={destinatarioFinal === moradorSel.nome_responsavel ? "default" : "secondary"}
-                                    onClick={() => setDestinatarioFinal(moradorSel.nome_responsavel)}
-                                >
-                                    {moradorSel.nome_responsavel} (Titular)
-                                </Button>
-                                {/* @ts-ignore */}
-                                {obterMoradoresUnicos(moradorSel).map((dep: any) => (
+                                {origensComuns.map(item => (
                                     <Button
-                                        key={dep}
+                                        key={item}
                                         size="sm"
-                                        variant={destinatarioFinal === dep ? "default" : "secondary"}
-                                        onClick={() => setDestinatarioFinal(dep)}
+                                        variant={origem === item ? "default" : "outline"}
+                                        onClick={() => setOrigem(item)}
+                                        className={origem === item ? "bg-white text-black hover:bg-gray-200" : "text-gray-300 border-gray-600"}
                                     >
-                                        {dep}
+                                        {item}
                                     </Button>
                                 ))}
                             </div>
                         </div>
-                    )}
 
-                    {/* Origem */}
-                    <div>
-                        <p className="text-sm text-gray-300 mb-2">Origem:</p>
-                        <div className="flex flex-wrap gap-2">
-                            {origensComuns.map(item => (
-                                <Button
-                                    key={item}
-                                    size="sm"
-                                    variant={origem === item ? "default" : "outline"}
-                                    onClick={() => setOrigem(item)}
-                                    className={origem === item ? "bg-white text-black hover:bg-gray-200" : "text-gray-300 border-gray-600"}
-                                >
-                                    {item}
-                                </Button>
-                            ))}
+                        {/* Foto */}
+                        <CameraAutoCapture onCapture={file => setFotoFile(file)} accept="image/*" capture="environment">
+                            <div
+                                className="border-2 border-dashed border-gold/50 rounded-lg p-6 flex flex-col items-center justify-center cursor-pointer hover:bg-navy/50 transition-colors"
+                            >
+                                {fotoFile ? (
+                                    <div className="text-center">
+                                        <p className="text-gold font-bold">{fotoFile.name}</p>
+                                        <p className="text-xs text-gray-400">Clique para alterar</p>
+                                    </div>
+                                ) : (
+                                    <>
+                                        <Camera size={32} className="text-gold mb-2" />
+                                        <p className="text-gray-400 text-sm">Tirar foto da etiqueta</p>
+                                    </>
+                                )}
+                            </div>
+                        </CameraAutoCapture>
+
+                        <div className="flex items-center gap-2 px-1">
+                            <input
+                                type="checkbox"
+                                id="notificar"
+                                checked={notificarWhats}
+                                onChange={(e) => setNotificarWhats(e.target.checked)}
+                                className="w-5 h-5 rounded border-gray-300 text-gold focus:ring-gold accent-gold cursor-pointer"
+                            />
+                            <label htmlFor="notificar" className="text-sm text-gray-300 cursor-pointer select-none">
+                                Enviar notificação via WhatsApp
+                            </label>
                         </div>
-                    </div>
 
-                    {/* Foto */}
-                    <CameraAutoCapture onCapture={file => setFotoFile(file)} accept="image/*" capture="environment">
-                        <div
-                            className="border-2 border-dashed border-gold/50 rounded-lg p-6 flex flex-col items-center justify-center cursor-pointer hover:bg-navy/50 transition-colors"
-                        >
-                            {fotoFile ? (
-                                <div className="text-center">
-                                    <p className="text-gold font-bold">{fotoFile.name}</p>
-                                    <p className="text-xs text-gray-400">Clique para alterar</p>
+                        {!reciboGerado && (
+                            <Button
+                                className="w-full bg-success text-white font-bold h-12"
+                                onClick={handleRegistrar}
+                                disabled={loading}
+                            >
+                                <Send className="mr-2" size={18} />
+                                {loading ? "ENVIANDO..." : "REGISTRAR ENCOMENDA"}
+                            </Button>
+                        )}
+
+                        {/* SUCCESS VIEW (PDF / WHATSAPP ACTIONS) */}
+                        {reciboGerado && (
+                            <div className="mt-4 p-4 bg-green-900/40 border border-green-500 rounded-lg animate-in fade-in slide-in-from-bottom-2">
+                                <div className="flex items-center text-green-400 font-bold mb-3">
+                                    <Check className="mr-2" size={24} /> Encomenda Registrada com Sucesso!
                                 </div>
-                            ) : (
-                                <>
-                                    <Camera size={32} className="text-gold mb-2" />
-                                    <p className="text-gray-400 text-sm">Tirar foto da etiqueta</p>
-                                </>
-                            )}
-                        </div>
-                    </CameraAutoCapture>
-
-                    <div className="flex items-center gap-2 px-1">
-                        <input
-                            type="checkbox"
-                            id="notificar"
-                            checked={notificarWhats}
-                            onChange={(e) => setNotificarWhats(e.target.checked)}
-                            className="w-5 h-5 rounded border-gray-300 text-gold focus:ring-gold accent-gold cursor-pointer"
-                        />
-                        <label htmlFor="notificar" className="text-sm text-gray-300 cursor-pointer select-none">
-                            Enviar notificação via WhatsApp
-                        </label>
-                    </div>
-
-                    {!reciboGerado && (
-                        <Button
-                            className="w-full bg-success text-white font-bold h-12"
-                            onClick={handleRegistrar}
-                            disabled={loading}
-                        >
-                            <Send className="mr-2" size={18} />
-                            {loading ? "ENVIANDO..." : "REGISTRAR ENCOMENDA"}
-                        </Button>
-                    )}
-
-                    {/* SUCCESS VIEW (PDF / WHATSAPP ACTIONS) */}
-                    {reciboGerado && (
-                        <div className="mt-4 p-4 bg-green-900/40 border border-green-500 rounded-lg animate-in fade-in slide-in-from-bottom-2">
-                            <div className="flex items-center text-green-400 font-bold mb-3">
-                                <Check className="mr-2" size={24} /> Encomenda Registrada com Sucesso!
+                                <p className="text-sm text-gray-300 mb-4">
+                                    Você já pode gerar o comprovante, enviar pelo WhatsApp e realizar um novo registro tudo em um clique!
+                                </p>
+                                <div className="flex flex-col gap-3">
+                                    <Button className="w-full bg-green-600 hover:bg-green-700 text-white h-12 font-bold shadow-lg" onClick={handleConcluirECompartilhar}>
+                                        <Send className="mr-2" size={18} /> GERAR PDF E ABRIR WHATSAPP
+                                    </Button>
+                                    <Button variant="ghost" className="w-full text-gray-400 mt-2" onClick={() => setReciboGerado(null)}>
+                                        Realizar Novo Registro
+                                    </Button>
+                                </div>
                             </div>
-                            <p className="text-sm text-gray-300 mb-4">
-                                Você já pode gerar o comprovante, enviar pelo WhatsApp e realizar um novo registro tudo em um clique!
-                            </p>
-                            <div className="flex flex-col gap-3">
-                                <Button className="w-full bg-green-600 hover:bg-green-700 text-white h-12 font-bold shadow-lg" onClick={handleConcluirECompartilhar}>
-                                    <Send className="mr-2" size={18} /> GERAR PDF E ABRIR WHATSAPP
-                                </Button>
-                                <Button variant="ghost" className="w-full text-gray-400 mt-2" onClick={() => setReciboGerado(null)}>
-                                    Realizar Novo Registro
+                        )}
+
+                    </CardContent>
+                </Card>
+
+                {/* LISTA PENDENTES */}
+                <div className="space-y-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
+                        <h2 className="text-xl font-bold text-white">Na Portaria ({encomendasPendentes.length})</h2>
+                        <div className="flex gap-2 flex-wrap items-center">
+                            <Button size="sm" variant="outline" className="border-gold text-gold hover:bg-gold hover:text-navy font-bold" onClick={handleGerarRelatorioPendentes}>
+                                <FileText size={16} className="mr-1" /> PDF Pendentes
+                            </Button>
+                            <div className="flex items-center gap-1 border border-green-500 rounded p-1 bg-navy-light shrink-0">
+                                <Input
+                                    type="date"
+                                    className="h-7 text-xs bg-navy text-white border-none w-[120px]"
+                                    value={dataFiltroEntregues}
+                                    onChange={(e) => setDataFiltroEntregues(e.target.value)}
+                                />
+                                <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white font-bold h-7 px-2" onClick={handleGerarRelatorioEntregues}>
+                                    <Check size={14} className="mr-1" /> PDF Entregues
                                 </Button>
                             </div>
+                            <Input placeholder="Filtro AP" className="w-24 bg-navy-light border-gray-600 text-white h-9 text-sm" value={filtroAp} onChange={e => setFiltroAp(e.target.value)} />
+                            <Input placeholder="Filtro Bloco" className="w-28 bg-navy-light border-gray-600 text-white h-9 text-sm" value={filtroBloco} onChange={e => setFiltroBloco(e.target.value)} />
                         </div>
-                    )}
-
-                </CardContent>
-            </Card>
-
-            {/* LISTA PENDENTES */}
-            <div className="space-y-4">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
-                    <h2 className="text-xl font-bold text-white">Na Portaria ({encomendasPendentes.length})</h2>
-                    <div className="flex gap-2 flex-wrap items-center">
-                        <Button size="sm" variant="outline" className="border-gold text-gold hover:bg-gold hover:text-navy font-bold" onClick={handleGerarRelatorioPendentes}>
-                            <FileText size={16} className="mr-1" /> PDF Pendentes
-                        </Button>
-                        <Button size="sm" variant="outline" className="border-green-500 text-green-500 hover:bg-green-500 hover:text-white font-bold" onClick={handleGerarRelatorioEntregues}>
-                            <Check size={16} className="mr-1" /> PDF Entregues
-                        </Button>
-                        <Input placeholder="Filtro AP" className="w-24 bg-navy-light border-gray-600 text-white h-9 text-sm" value={filtroAp} onChange={e => setFiltroAp(e.target.value)} />
-                        <Input placeholder="Filtro Bloco" className="w-28 bg-navy-light border-gray-600 text-white h-9 text-sm" value={filtroBloco} onChange={e => setFiltroBloco(e.target.value)} />
                     </div>
-                </div>
 
-                {encomendasPendentes
-                    .filter(enc => (!filtroAp || String(enc.apartamento) === filtroAp) && (!filtroBloco || String(enc.bloco).toLowerCase() === filtroBloco.toLowerCase()))
-                    .length === 0 && <p className="text-gray-500">Nenhuma encomenda encontrada para os filtros aplicados.</p>}
-
-                <div className="space-y-3 max-h-[80vh] overflow-y-auto pr-2">
                     {encomendasPendentes
                         .filter(enc => (!filtroAp || String(enc.apartamento) === filtroAp) && (!filtroBloco || String(enc.bloco).toLowerCase() === filtroBloco.toLowerCase()))
-                        .map(enc => (
-                            <Card key={enc.id} className="bg-white border-none shadow-sm cursor-pointer hover:bg-gray-50 transition-colors">
-                                <CardContent className="p-4 flex items-center gap-3" onClick={() => setItemDetalhes(enc)}>
-                                    {enc.foto_url ? (
-                                        <img src={enc.foto_url} className="w-12 h-12 rounded object-cover bg-gray-200" alt="Pacote" />
-                                    ) : (
-                                        <div className="w-12 h-12 rounded bg-navy-light flex items-center justify-center text-gold">
-                                            <Package size={24} />
+                        .length === 0 && <p className="text-gray-500">Nenhuma encomenda encontrada para os filtros aplicados.</p>}
+
+                    <div className="space-y-3 max-h-[80vh] overflow-y-auto pr-2">
+                        {encomendasPendentes
+                            .filter(enc => (!filtroAp || String(enc.apartamento) === filtroAp) && (!filtroBloco || String(enc.bloco).toLowerCase() === filtroBloco.toLowerCase()))
+                            .map(enc => (
+                                <Card key={enc.id} className="bg-white border-none shadow-sm cursor-pointer hover:bg-gray-50 transition-colors">
+                                    <CardContent className="p-4 flex items-center gap-3" onClick={() => setItemDetalhes(enc)}>
+                                        {enc.foto_url ? (
+                                            <img src={enc.foto_url} className="w-12 h-12 rounded object-cover bg-gray-200" alt="Pacote" />
+                                        ) : (
+                                            <div className="w-12 h-12 rounded bg-navy-light flex items-center justify-center text-gold">
+                                                <Package size={24} />
+                                            </div>
+                                        )}
+
+                                        <div className="flex-1 min-w-0">
+                                            <h4 className="font-bold text-navy truncate">{enc.moradores?.nome_responsavel || "Desconhecido"}</h4>
+                                            <p className="text-sm text-gray-600 truncate">Origem: {enc.origem} • AP {enc.apartamento}{enc.bloco ? ` • BLC ${enc.bloco}` : ''}</p>
+                                            {enc.destinatario && <p className="text-xs text-blue-600 font-bold">Para: {enc.destinatario}</p>}
+                                            <p className="text-xs text-gray-400">{new Date(enc.data_chegada).toLocaleString()}</p>
                                         </div>
-                                    )}
-
-                                    <div className="flex-1 min-w-0">
-                                        <h4 className="font-bold text-navy truncate">{enc.moradores?.nome_responsavel || "Desconhecido"}</h4>
-                                        <p className="text-sm text-gray-600 truncate">Origem: {enc.origem} • AP {enc.apartamento}{enc.bloco ? ` • BLC ${enc.bloco}` : ''}</p>
-                                        {enc.destinatario && <p className="text-xs text-blue-600 font-bold">Para: {enc.destinatario}</p>}
-                                        <p className="text-xs text-gray-400">{new Date(enc.data_chegada).toLocaleString()}</p>
-                                    </div>
-                                </CardContent>
-                                {/* Actions outside onClick to avoid triggering modal */}
-                                <div className="flex flex-col gap-2 p-2 pt-0 z-10 w-full sm:w-auto">
-                                    <Button size="sm" className="bg-blue-600 hover:bg-blue-700 h-8 font-bold w-full" onClick={(e) => { e.stopPropagation(); handleBaixa(enc); }}>
-                                        BAIXA TOKEN/CPF
-                                    </Button>
-                                    <div className="flex gap-2">
-                                        <Button size="sm" variant="outline" className="border-blue-600 text-blue-600 hover:bg-blue-50 h-8 flex-1 font-bold tracking-tight px-1" onClick={(e) => {
-                                            e.stopPropagation();
-                                            setBaixaFotoModalItem(enc);
-                                            setBaixaNomeRecebedor(enc.destinatario || enc.moradores?.nome_responsavel || '');
-                                            setBaixaCpfRecebedor('');
-                                            setBaixaFinalizaCadastro(false);
-
-                                            // Auto-detect other packages for the same unit
-                                            const pacotesDoMesmoAp = encomendasPendentes.filter(p =>
-                                                p.id !== enc.id &&
-                                                p.apartamento === enc.apartamento &&
-                                                (p.bloco || "").toLowerCase() === (enc.bloco || "").toLowerCase()
-                                            );
-                                            setBaixaLoteIds([enc.id, ...pacotesDoMesmoAp.map(p => p.id)]);
-                                        }}>
-                                            <Camera size={14} className="mr-1" /> FOTO
+                                    </CardContent>
+                                    {/* Actions outside onClick to avoid triggering modal */}
+                                    <div className="flex flex-col gap-2 p-2 pt-0 z-10 w-full sm:w-auto">
+                                        <Button size="sm" className="bg-blue-600 hover:bg-blue-700 h-8 font-bold w-full" onClick={(e) => { e.stopPropagation(); handleBaixa(enc); }}>
+                                            BAIXA TOKEN/CPF
                                         </Button>
-                                        {userRole !== 'porteiro' && (
-                                            <Button size="icon" variant="ghost" className="h-8 w-8 text-red-500 hover:bg-red-50 shrink-0" onClick={async (e) => {
+                                        <div className="flex gap-2">
+                                            <Button size="sm" variant="outline" className="border-blue-600 text-blue-600 hover:bg-blue-50 h-8 flex-1 font-bold tracking-tight px-1" onClick={(e) => {
                                                 e.stopPropagation();
-                                                if (confirm("Excluir encomenda?")) {
-                                                    await removerEncomenda(enc.id);
-                                                    carregarDados();
-                                                }
+                                                setBaixaFotoModalItem(enc);
+                                                setBaixaNomeRecebedor('');
+                                                setBaixaCpfRecebedor('');
+                                                setBaixaFinalizaCadastro(false);
+
+                                                // Auto-detect other packages for the same unit
+                                                const pacotesDoMesmoAp = encomendasPendentes.filter(p =>
+                                                    p.id !== enc.id &&
+                                                    p.apartamento === enc.apartamento &&
+                                                    (p.bloco || "").toLowerCase() === (enc.bloco || "").toLowerCase()
+                                                );
+                                                setBaixaLoteIds([enc.id, ...pacotesDoMesmoAp.map(p => p.id)]);
                                             }}>
-                                                <Trash2 size={16} />
+                                                <Camera size={14} className="mr-1" /> FOTO
                                             </Button>
+                                            {userRole !== 'porteiro' && (
+                                                <Button size="icon" variant="ghost" className="h-8 w-8 text-red-500 hover:bg-red-50 shrink-0" onClick={async (e) => {
+                                                    e.stopPropagation();
+                                                    if (confirm("Excluir encomenda?")) {
+                                                        await removerEncomenda(enc.id);
+                                                        carregarDados();
+                                                    }
+                                                }}>
+                                                    <Trash2 size={16} />
+                                                </Button>
+                                            )}
+                                        </div>
+                                    </div>
+                                </Card>
+                            ))}
+                    </div>
+                </div>
+
+                <DetailsModal
+                    isOpen={!!itemDetalhes}
+                    onClose={() => setItemDetalhes(null)}
+                    title="Detalhes da Encomenda"
+                    data={itemDetalhes}
+                    type="encomenda"
+                />
+
+                {/* Modal para Baixa por Foto */}
+                {baixaFotoModalItem && (
+                    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+                        <Card className="w-full max-w-sm bg-navy border-blue-500 shadow-2xl animate-in fade-in zoom-in duration-200">
+                            <CardHeader className="pb-3 border-b border-gray-700">
+                                <CardTitle className="text-xl font-bold text-white flex justify-between items-center">
+                                    Baixa por Foto
+                                    <Button variant="ghost" size="icon" onClick={() => setBaixaFotoModalItem(null)} className="h-8 w-8 text-gray-400 hover:text-white">
+                                        ✕
+                                    </Button>
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent className="pt-4 space-y-4 max-h-[85vh] overflow-y-auto">
+                                <div className="bg-blue-900/20 p-3 rounded text-sm text-blue-200 border border-blue-500/30">
+                                    <p><strong>Morador:</strong> {baixaFotoModalItem.moradores?.nome_responsavel}</p>
+                                    <p><strong>Unidade:</strong> AP {baixaFotoModalItem.apartamento}</p>
+                                </div>
+
+                                {/* Detecção de Múltiplos Pacotes */}
+                                {baixaLoteIds.length > 1 && (
+                                    <div className="bg-yellow-900/40 border border-yellow-600/50 p-3 rounded">
+                                        <h4 className="font-bold text-yellow-500 text-sm mb-2 flex items-center">
+                                            <Package className="mr-2" size={16} />
+                                            {baixaLoteIds.length} pacotes pendentes para o AP {baixaFotoModalItem.apartamento}
+                                        </h4>
+                                        <p className="text-xs text-yellow-200/80 mb-3">
+                                            Desmarque os pacotes que <strong>não</strong> serão entregues agora:
+                                        </p>
+                                        <div className="space-y-2 max-h-32 overflow-y-auto pr-2">
+                                            {encomendasPendentes
+                                                .filter(p => p.apartamento === baixaFotoModalItem.apartamento && p.bloco === baixaFotoModalItem.bloco)
+                                                .map(p => (
+                                                    <div key={p.id} className="flex items-center gap-2 text-sm text-white">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={baixaLoteIds.includes(p.id)}
+                                                            onChange={(e) => {
+                                                                if (e.target.checked) setBaixaLoteIds([...baixaLoteIds, p.id]);
+                                                                else setBaixaLoteIds(baixaLoteIds.filter(id => id !== p.id));
+                                                            }}
+                                                            className="w-4 h-4 rounded border-gray-300 text-yellow-500 focus:ring-yellow-500 bg-navy"
+                                                        />
+                                                        <span className="truncate">{p.origem} {p.destinatario ? `(${p.destinatario})` : ''}</span>
+                                                    </div>
+                                                ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                <div className="space-y-2">
+                                    <label className="text-sm font-semibold text-white">Nome de quem está retirando:</label>
+                                    <Input
+                                        value={baixaNomeRecebedor}
+                                        onChange={(e) => setBaixaNomeRecebedor(e.target.value)}
+                                        placeholder="Ex: João da Silva (Filho)"
+                                        className="bg-navy-light text-white border-gray-600 focus:border-blue-500 rounded"
+                                    />
+                                </div>
+
+                                <div className="space-y-2 mt-3">
+                                    <label className="text-sm font-semibold text-white">CPF (Opcional):</label>
+                                    <Input
+                                        value={baixaCpfRecebedor}
+                                        onChange={(e) => setBaixaCpfRecebedor(e.target.value.replace(/\D/g, '').replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d{1,2})$/, '$1-$2'))}
+                                        placeholder="000.000.000-00"
+                                        maxLength={14}
+                                        className="bg-navy-light text-white border-gray-600 focus:border-blue-500 rounded"
+                                    />
+                                </div>
+
+                                {/* Opcional: Efetivar Cadastro Avulso */}
+                                {baixaFotoModalItem?.moradores?.nome_responsavel === "Pendente Cadastro" && (
+                                    <div className="mt-4 p-3 bg-blue-900/30 border border-blue-500/50 rounded flex flex-col gap-3">
+                                        <div className="flex gap-3 items-start">
+                                            <input
+                                                type="checkbox"
+                                                id="efetivar"
+                                                checked={baixaFinalizaCadastro}
+                                                onChange={(e) => setBaixaFinalizaCadastro(e.target.checked)}
+                                                className="mt-1 w-5 h-5 rounded border-gray-300 text-blue-500 focus:ring-blue-500"
+                                            />
+                                            <label htmlFor="efetivar" className="text-sm text-blue-100 cursor-pointer">
+                                                <span className="font-bold block">Efetivar Morador Desta Unidade?</span>
+                                                Salvar o responsável definitivo da unidade AP {baixaFotoModalItem.apartamento}.
+                                            </label>
+                                        </div>
+
+                                        {/* Campos de Cadastro Adicionais */}
+                                        {baixaFinalizaCadastro && (
+                                            <div className="mt-2 space-y-3 pt-3 border-t border-blue-500/30 animate-in fade-in slide-in-from-top-2">
+                                                <div className="space-y-1">
+                                                    <label className="text-xs font-semibold text-blue-300">Nome do Titular da Unidade *</label>
+                                                    <Input
+                                                        value={baixaNomeTitular}
+                                                        onChange={(e) => setBaixaNomeTitular(e.target.value)}
+                                                        placeholder="João da Silva Pereira"
+                                                        className="bg-navy border-blue-500/50 text-white h-8 text-sm"
+                                                    />
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <label className="text-xs font-semibold text-blue-300">WhatsApp *</label>
+                                                    <Input
+                                                        value={baixaWhatsapp}
+                                                        onChange={(e) => setBaixaWhatsapp(e.target.value)}
+                                                        placeholder="(11) 99999-9999"
+                                                        className="bg-navy border-blue-500/50 text-white h-8 text-sm"
+                                                    />
+                                                </div>
+                                                <div className="grid grid-cols-2 gap-2">
+                                                    <div className="space-y-1">
+                                                        <label className="text-xs font-semibold text-blue-300">Carro</label>
+                                                        <Input
+                                                            value={baixaCarro}
+                                                            onChange={(e) => setBaixaCarro(e.target.value)}
+                                                            placeholder="Modelo/Placa"
+                                                            className="bg-navy border-blue-500/50 text-white h-8 text-sm uppercase"
+                                                        />
+                                                    </div>
+                                                    <div className="space-y-1">
+                                                        <label className="text-xs font-semibold text-blue-300">Moto</label>
+                                                        <Input
+                                                            value={baixaMoto}
+                                                            onChange={(e) => setBaixaMoto(e.target.value)}
+                                                            placeholder="Modelo/Placa"
+                                                            className="bg-navy border-blue-500/50 text-white h-8 text-sm uppercase"
+                                                        />
+                                                    </div>
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <label className="text-xs font-semibold text-blue-300">Dependentes (Opcional)</label>
+                                                    <textarea
+                                                        value={baixaDependentes}
+                                                        onChange={(e) => setBaixaDependentes(e.target.value)}
+                                                        placeholder="Maria, João..."
+                                                        className="w-full bg-navy border border-blue-500/50 text-white rounded p-2 text-sm min-h-[60px]"
+                                                    />
+                                                </div>
+                                            </div>
                                         )}
                                     </div>
+                                )}
+
+                                <div className="pt-2">
+                                    <CameraAutoCapture onCapture={handleBaixaPorFotoConfirmar} accept="image/*" capture="user">
+                                        <Button
+                                            disabled={baixaProcessando || !baixaNomeRecebedor.trim()}
+                                            className={`w-full h-12 text-sm font-bold shadow-lg ${baixaProcessando ? 'bg-gray-600' : 'bg-blue-600 hover:bg-blue-500 text-white'}`}
+                                        >
+                                            {baixaProcessando ? (
+                                                "Processando..."
+                                            ) : (
+                                                <>
+                                                    <Camera size={20} className="mr-2" /> Capturar Foto e Entregar
+                                                </>
+                                            )}
+                                        </Button>
+                                    </CameraAutoCapture>
+                                    <p className="text-xs text-gray-500 text-center mt-3">A foto servirá como comprovante eterno de retirada.</p>
                                 </div>
-                            </Card>
-                        ))}
-                </div>
-            </div>
+                            </CardContent>
+                        </Card>
+                    </div>
+                )}
 
-            <DetailsModal
-                isOpen={!!itemDetalhes}
-                onClose={() => setItemDetalhes(null)}
-                title="Detalhes da Encomenda"
-                data={itemDetalhes}
-                type="encomenda"
-            />
-
-            {/* Modal para Baixa por Foto */}
-            {baixaFotoModalItem && (
-                <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-                    <Card className="w-full max-w-sm bg-navy border-blue-500 shadow-2xl animate-in fade-in zoom-in duration-200">
-                        <CardHeader className="pb-3 border-b border-gray-700">
-                            <CardTitle className="text-xl font-bold text-white flex justify-between items-center">
-                                Baixa por Foto
-                                <Button variant="ghost" size="icon" onClick={() => setBaixaFotoModalItem(null)} className="h-8 w-8 text-gray-400 hover:text-white">
-                                    ✕
-                                </Button>
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent className="pt-4 space-y-4 max-h-[85vh] overflow-y-auto">
-                            <div className="bg-blue-900/20 p-3 rounded text-sm text-blue-200 border border-blue-500/30">
-                                <p><strong>Morador:</strong> {baixaFotoModalItem.moradores?.nome_responsavel}</p>
-                                <p><strong>Unidade:</strong> AP {baixaFotoModalItem.apartamento}</p>
-                            </div>
-
-                            {/* Detecção de Múltiplos Pacotes */}
-                            {baixaLoteIds.length > 1 && (
-                                <div className="bg-yellow-900/40 border border-yellow-600/50 p-3 rounded">
-                                    <h4 className="font-bold text-yellow-500 text-sm mb-2 flex items-center">
-                                        <Package className="mr-2" size={16} />
-                                        {baixaLoteIds.length} pacotes pendentes para o AP {baixaFotoModalItem.apartamento}
-                                    </h4>
-                                    <p className="text-xs text-yellow-200/80 mb-3">
-                                        Desmarque os pacotes que <strong>não</strong> serão entregues agora:
-                                    </p>
-                                    <div className="space-y-2 max-h-32 overflow-y-auto pr-2">
-                                        {encomendasPendentes
-                                            .filter(p => p.apartamento === baixaFotoModalItem.apartamento && p.bloco === baixaFotoModalItem.bloco)
-                                            .map(p => (
-                                                <div key={p.id} className="flex items-center gap-2 text-sm text-white">
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={baixaLoteIds.includes(p.id)}
-                                                        onChange={(e) => {
-                                                            if (e.target.checked) setBaixaLoteIds([...baixaLoteIds, p.id]);
-                                                            else setBaixaLoteIds(baixaLoteIds.filter(id => id !== p.id));
-                                                        }}
-                                                        className="w-4 h-4 rounded border-gray-300 text-yellow-500 focus:ring-yellow-500 bg-navy"
-                                                    />
-                                                    <span className="truncate">{p.origem} {p.destinatario ? `(${p.destinatario})` : ''}</span>
-                                                </div>
-                                            ))}
-                                    </div>
+                {/* Modal para Baixa por Token/CPF */}
+                {baixaTokenModalItem && (
+                    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+                        <Card className="w-full max-w-sm bg-navy border-blue-500 shadow-2xl animate-in fade-in zoom-in duration-200">
+                            <CardHeader className="pb-3 border-b border-gray-700">
+                                <CardTitle className="text-xl font-bold text-white flex justify-between items-center">
+                                    Baixa por Token ou CPF
+                                    <Button variant="ghost" size="icon" onClick={() => setBaixaTokenModalItem(null)} className="h-8 w-8 text-gray-400 hover:text-white">
+                                        ✕
+                                    </Button>
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent className="pt-4 space-y-4 max-h-[85vh] overflow-y-auto">
+                                <div className="bg-blue-900/20 p-3 rounded text-sm text-blue-200 border border-blue-500/30">
+                                    <p><strong>Morador:</strong> {baixaTokenModalItem.moradores?.nome_responsavel}</p>
+                                    <p><strong>Unidade:</strong> AP {baixaTokenModalItem.apartamento}</p>
                                 </div>
-                            )}
 
-                            <div className="space-y-2">
-                                <label className="text-sm font-semibold text-white">Nome de quem está retirando:</label>
-                                <Input
-                                    value={baixaNomeRecebedor}
-                                    onChange={(e) => setBaixaNomeRecebedor(e.target.value)}
-                                    placeholder="Ex: João da Silva (Filho)"
-                                    className="bg-navy-light text-white border-gray-600 focus:border-blue-500 rounded"
-                                />
-                            </div>
-
-                            <div className="space-y-2 mt-3">
-                                <label className="text-sm font-semibold text-white">CPF (Opcional):</label>
-                                <Input
-                                    value={baixaCpfRecebedor}
-                                    onChange={(e) => setBaixaCpfRecebedor(e.target.value.replace(/\D/g, '').replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d{1,2})$/, '$1-$2'))}
-                                    placeholder="000.000.000-00"
-                                    maxLength={14}
-                                    className="bg-navy-light text-white border-gray-600 focus:border-blue-500 rounded"
-                                />
-                            </div>
-
-                            {/* Opcional: Efetivar Cadastro Avulso */}
-                            {baixaFotoModalItem?.moradores?.nome_responsavel === "Pendente Cadastro" && (
-                                <div className="mt-4 p-3 bg-blue-900/30 border border-blue-500/50 rounded flex flex-col gap-3">
-                                    <div className="flex gap-3 items-start">
-                                        <input
-                                            type="checkbox"
-                                            id="efetivar"
-                                            checked={baixaFinalizaCadastro}
-                                            onChange={(e) => setBaixaFinalizaCadastro(e.target.checked)}
-                                            className="mt-1 w-5 h-5 rounded border-gray-300 text-blue-500 focus:ring-blue-500"
-                                        />
-                                        <label htmlFor="efetivar" className="text-sm text-blue-100 cursor-pointer">
-                                            <span className="font-bold block">Efetivar Morador Desta Unidade?</span>
-                                            Salvar o responsável definitivo da unidade AP {baixaFotoModalItem.apartamento}.
-                                        </label>
-                                    </div>
-
-                                    {/* Campos de Cadastro Adicionais */}
-                                    {baixaFinalizaCadastro && (
-                                        <div className="mt-2 space-y-3 pt-3 border-t border-blue-500/30 animate-in fade-in slide-in-from-top-2">
-                                            <div className="space-y-1">
-                                                <label className="text-xs font-semibold text-blue-300">Nome do Titular da Unidade *</label>
-                                                <Input
-                                                    value={baixaNomeTitular}
-                                                    onChange={(e) => setBaixaNomeTitular(e.target.value)}
-                                                    placeholder="João da Silva Pereira"
-                                                    className="bg-navy border-blue-500/50 text-white h-8 text-sm"
-                                                />
-                                            </div>
-                                            <div className="space-y-1">
-                                                <label className="text-xs font-semibold text-blue-300">WhatsApp *</label>
-                                                <Input
-                                                    value={baixaWhatsapp}
-                                                    onChange={(e) => setBaixaWhatsapp(e.target.value)}
-                                                    placeholder="(11) 99999-9999"
-                                                    className="bg-navy border-blue-500/50 text-white h-8 text-sm"
-                                                />
-                                            </div>
-                                            <div className="grid grid-cols-2 gap-2">
-                                                <div className="space-y-1">
-                                                    <label className="text-xs font-semibold text-blue-300">Carro</label>
-                                                    <Input
-                                                        value={baixaCarro}
-                                                        onChange={(e) => setBaixaCarro(e.target.value)}
-                                                        placeholder="Modelo/Placa"
-                                                        className="bg-navy border-blue-500/50 text-white h-8 text-sm uppercase"
-                                                    />
-                                                </div>
-                                                <div className="space-y-1">
-                                                    <label className="text-xs font-semibold text-blue-300">Moto</label>
-                                                    <Input
-                                                        value={baixaMoto}
-                                                        onChange={(e) => setBaixaMoto(e.target.value)}
-                                                        placeholder="Modelo/Placa"
-                                                        className="bg-navy border-blue-500/50 text-white h-8 text-sm uppercase"
-                                                    />
-                                                </div>
-                                            </div>
-                                            <div className="space-y-1">
-                                                <label className="text-xs font-semibold text-blue-300">Dependentes (Opcional)</label>
-                                                <textarea
-                                                    value={baixaDependentes}
-                                                    onChange={(e) => setBaixaDependentes(e.target.value)}
-                                                    placeholder="Maria, João..."
-                                                    className="w-full bg-navy border border-blue-500/50 text-white rounded p-2 text-sm min-h-[60px]"
-                                                />
-                                            </div>
+                                {/* Lotes Encontrados */}
+                                {encomendasPendentes.filter((item: any) => item.apartamento === baixaTokenModalItem.apartamento && item.bloco === baixaTokenModalItem.bloco).length > 1 && (
+                                    <div className="bg-yellow-900/20 p-3 rounded border border-yellow-600/50">
+                                        <p className="text-sm text-yellow-500 font-bold mb-2">
+                                            Entregar {encomendasPendentes.filter((item: any) => item.apartamento === baixaTokenModalItem.apartamento && item.bloco === baixaTokenModalItem.bloco).length} pacotes pendentes?
+                                        </p>
+                                        <div className="space-y-2 max-h-32 overflow-y-auto pr-1">
+                                            {encomendasPendentes
+                                                .filter((item: any) => item.apartamento === baixaTokenModalItem.apartamento && item.bloco === baixaTokenModalItem.bloco)
+                                                .map((enc: any) => (
+                                                    <label key={enc.id} className="flex items-center gap-2 cursor-pointer p-1.5 hover:bg-navy rounded">
+                                                        <input
+                                                            type="checkbox"
+                                                            className="w-4 h-4 text-gold rounded border-gray-500 focus:ring-gold focus:ring-opacity-25"
+                                                            checked={baixaLoteIds.includes(enc.id)}
+                                                            onChange={(e) => {
+                                                                if (e.target.checked) {
+                                                                    setBaixaLoteIds(prev => [...prev, enc.id]);
+                                                                } else {
+                                                                    setBaixaLoteIds(prev => prev.filter(id => id !== enc.id));
+                                                                }
+                                                            }}
+                                                        />
+                                                        <div className="flex flex-col">
+                                                            <span className="text-xs text-white">{enc.origem} - {enc.nome_destinatario}</span>
+                                                            <span className="text-[10px] text-gray-400">{new Date(enc.data_chegada).toLocaleString('pt-BR')}</span>
+                                                        </div>
+                                                    </label>
+                                                ))}
                                         </div>
-                                    )}
-                                </div>
-                            )}
+                                    </div>
+                                )}
 
-                            <div className="pt-2">
-                                <CameraAutoCapture onCapture={handleBaixaPorFotoConfirmar} accept="image/*" capture="user">
+                                <div className="space-y-2">
+                                    <label className="text-sm font-semibold text-white">Nome de quem está retirando:</label>
+                                    <Input
+                                        value={baixaNomeRecebedor}
+                                        onChange={(e) => setBaixaNomeRecebedor(e.target.value)}
+                                        placeholder="Ex: João da Silva (Filho)"
+                                        className="bg-navy-light text-white border-gray-600 focus:border-blue-500 rounded"
+                                    />
+                                </div>
+
+                                <div className="space-y-2">
+                                    <label className="text-sm font-semibold text-white">Digite o TOKEN ou CPF para retirada:</label>
+                                    <Input
+                                        value={baixaTokenInput}
+                                        onChange={(e) => setBaixaTokenInput(e.target.value)}
+                                        placeholder="Ex: 1234 ou 000.000.000-00"
+                                        className="bg-navy-light text-white border-gray-600 focus:border-blue-500 rounded"
+                                        autoFocus
+                                    />
+                                </div>
+
+                                {/* Opcional: Efetivar Cadastro Avulso */}
+                                {baixaTokenModalItem?.moradores?.nome_responsavel === "Pendente Cadastro" && (
+                                    <div className="mt-4 p-3 bg-blue-900/30 border border-blue-500/50 rounded flex flex-col gap-3">
+                                        <div className="flex gap-3 items-start">
+                                            <input
+                                                type="checkbox"
+                                                id="efetivarToken"
+                                                checked={baixaFinalizaCadastro}
+                                                onChange={(e) => setBaixaFinalizaCadastro(e.target.checked)}
+                                                className="mt-1 w-5 h-5 rounded border-gray-300 text-blue-500 focus:ring-blue-500"
+                                            />
+                                            <label htmlFor="efetivarToken" className="text-sm text-blue-100 cursor-pointer">
+                                                <span className="font-bold block">Efetivar Morador Desta Unidade?</span>
+                                                Salvar o responsável definitivo da unidade AP {baixaTokenModalItem.apartamento}.
+                                            </label>
+                                        </div>
+
+                                        {/* Campos de Cadastro Adicionais */}
+                                        {baixaFinalizaCadastro && (
+                                            <div className="mt-2 space-y-3 pt-3 border-t border-blue-500/30 animate-in fade-in slide-in-from-top-2">
+                                                <div className="space-y-1">
+                                                    <label className="text-xs font-semibold text-blue-300">Nome do Titular da Unidade *</label>
+                                                    <Input
+                                                        value={baixaNomeTitular}
+                                                        onChange={(e) => setBaixaNomeTitular(e.target.value)}
+                                                        placeholder="João da Silva Pereira"
+                                                        className="bg-navy border-blue-500/50 text-white h-8 text-sm"
+                                                    />
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <label className="text-xs font-semibold text-blue-300">WhatsApp *</label>
+                                                    <Input
+                                                        value={baixaWhatsapp}
+                                                        onChange={(e) => setBaixaWhatsapp(e.target.value)}
+                                                        placeholder="(11) 99999-9999"
+                                                        className="bg-navy border-blue-500/50 text-white h-8 text-sm"
+                                                    />
+                                                </div>
+                                                <div className="grid grid-cols-2 gap-2">
+                                                    <div className="space-y-1">
+                                                        <label className="text-xs font-semibold text-blue-300">Carro</label>
+                                                        <Input
+                                                            value={baixaCarro}
+                                                            onChange={(e) => setBaixaCarro(e.target.value)}
+                                                            placeholder="Modelo/Placa"
+                                                            className="bg-navy border-blue-500/50 text-white h-8 text-sm uppercase"
+                                                        />
+                                                    </div>
+                                                    <div className="space-y-1">
+                                                        <label className="text-xs font-semibold text-blue-300">Moto</label>
+                                                        <Input
+                                                            value={baixaMoto}
+                                                            onChange={(e) => setBaixaMoto(e.target.value)}
+                                                            placeholder="Modelo/Placa"
+                                                            className="bg-navy border-blue-500/50 text-white h-8 text-sm uppercase"
+                                                        />
+                                                    </div>
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <label className="text-xs font-semibold text-blue-300">Dependentes (Opcional)</label>
+                                                    <textarea
+                                                        value={baixaDependentes}
+                                                        onChange={(e) => setBaixaDependentes(e.target.value)}
+                                                        placeholder="Maria, João..."
+                                                        className="w-full bg-navy border border-blue-500/50 text-white rounded p-2 text-sm min-h-[60px]"
+                                                    />
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+
+                                <div className="pt-2">
                                     <Button
-                                        disabled={baixaProcessando || !baixaNomeRecebedor.trim()}
+                                        onClick={handleBaixaTokenConfirmar}
+                                        disabled={baixaProcessando || !baixaTokenInput.trim()}
                                         className={`w-full h-12 text-sm font-bold shadow-lg ${baixaProcessando ? 'bg-gray-600' : 'bg-blue-600 hover:bg-blue-500 text-white'}`}
                                     >
-                                        {baixaProcessando ? (
-                                            "Processando..."
-                                        ) : (
-                                            <>
-                                                <Camera size={20} className="mr-2" /> Capturar Foto e Entregar
-                                            </>
-                                        )}
+                                        {baixaProcessando ? 'PROCESSANDO...' : 'CONFIRMAR RETIRADA'}
                                     </Button>
-                                </CameraAutoCapture>
-                                <p className="text-xs text-gray-500 text-center mt-3">A foto servirá como comprovante eterno de retirada.</p>
-                            </div>
-                        </CardContent>
-                    </Card>
-                </div>
-            )}
-
-            {/* Modal para Baixa por Token/CPF */}
-            {baixaTokenModalItem && (
-                <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-                    <Card className="w-full max-w-sm bg-navy border-blue-500 shadow-2xl animate-in fade-in zoom-in duration-200">
-                        <CardHeader className="pb-3 border-b border-gray-700">
-                            <CardTitle className="text-xl font-bold text-white flex justify-between items-center">
-                                Baixa por Token ou CPF
-                                <Button variant="ghost" size="icon" onClick={() => setBaixaTokenModalItem(null)} className="h-8 w-8 text-gray-400 hover:text-white">
-                                    ✕
-                                </Button>
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent className="pt-4 space-y-4 max-h-[85vh] overflow-y-auto">
-                            <div className="bg-blue-900/20 p-3 rounded text-sm text-blue-200 border border-blue-500/30">
-                                <p><strong>Morador:</strong> {baixaTokenModalItem.moradores?.nome_responsavel}</p>
-                                <p><strong>Unidade:</strong> AP {baixaTokenModalItem.apartamento}</p>
-                            </div>
-
-                            {/* Lotes Encontrados */}
-                            {encomendasPendentes.filter((item: any) => item.apartamento === baixaTokenModalItem.apartamento && item.bloco === baixaTokenModalItem.bloco).length > 1 && (
-                                <div className="bg-yellow-900/20 p-3 rounded border border-yellow-600/50">
-                                    <p className="text-sm text-yellow-500 font-bold mb-2">
-                                        Entregar {encomendasPendentes.filter((item: any) => item.apartamento === baixaTokenModalItem.apartamento && item.bloco === baixaTokenModalItem.bloco).length} pacotes pendentes?
-                                    </p>
-                                    <div className="space-y-2 max-h-32 overflow-y-auto pr-1">
-                                        {encomendasPendentes
-                                            .filter((item: any) => item.apartamento === baixaTokenModalItem.apartamento && item.bloco === baixaTokenModalItem.bloco)
-                                            .map((enc: any) => (
-                                                <label key={enc.id} className="flex items-center gap-2 cursor-pointer p-1.5 hover:bg-navy rounded">
-                                                    <input
-                                                        type="checkbox"
-                                                        className="w-4 h-4 text-gold rounded border-gray-500 focus:ring-gold focus:ring-opacity-25"
-                                                        checked={baixaLoteIds.includes(enc.id)}
-                                                        onChange={(e) => {
-                                                            if (e.target.checked) {
-                                                                setBaixaLoteIds(prev => [...prev, enc.id]);
-                                                            } else {
-                                                                setBaixaLoteIds(prev => prev.filter(id => id !== enc.id));
-                                                            }
-                                                        }}
-                                                    />
-                                                    <div className="flex flex-col">
-                                                        <span className="text-xs text-white">{enc.origem} - {enc.nome_destinatario}</span>
-                                                        <span className="text-[10px] text-gray-400">{new Date(enc.data_chegada).toLocaleString('pt-BR')}</span>
-                                                    </div>
-                                                </label>
-                                            ))}
-                                    </div>
                                 </div>
-                            )}
+                            </CardContent>
+                        </Card>
+                    </div>
+                )}
 
-                            <div className="space-y-2">
-                                <label className="text-sm font-semibold text-white">Digite o TOKEN ou CPF para retirada:</label>
-                                <Input
-                                    value={baixaTokenInput}
-                                    onChange={(e) => setBaixaTokenInput(e.target.value)}
-                                    placeholder="Ex: 1234 ou 000.000.000-00"
-                                    className="bg-navy-light text-white border-gray-600 focus:border-blue-500 rounded"
-                                    autoFocus
-                                />
-                            </div>
-
-                            {/* Opcional: Efetivar Cadastro Avulso */}
-                            {baixaTokenModalItem?.moradores?.nome_responsavel === "Pendente Cadastro" && (
-                                <div className="mt-4 p-3 bg-blue-900/30 border border-blue-500/50 rounded flex flex-col gap-3">
-                                    <div className="flex gap-3 items-start">
-                                        <input
-                                            type="checkbox"
-                                            id="efetivarToken"
-                                            checked={baixaFinalizaCadastro}
-                                            onChange={(e) => setBaixaFinalizaCadastro(e.target.checked)}
-                                            className="mt-1 w-5 h-5 rounded border-gray-300 text-blue-500 focus:ring-blue-500"
-                                        />
-                                        <label htmlFor="efetivarToken" className="text-sm text-blue-100 cursor-pointer">
-                                            <span className="font-bold block">Efetivar Morador Desta Unidade?</span>
-                                            Salvar o responsável definitivo da unidade AP {baixaTokenModalItem.apartamento}.
-                                        </label>
-                                    </div>
-
-                                    {/* Campos de Cadastro Adicionais */}
-                                    {baixaFinalizaCadastro && (
-                                        <div className="mt-2 space-y-3 pt-3 border-t border-blue-500/30 animate-in fade-in slide-in-from-top-2">
-                                            <div className="space-y-1">
-                                                <label className="text-xs font-semibold text-blue-300">Nome do Titular da Unidade *</label>
-                                                <Input
-                                                    value={baixaNomeTitular}
-                                                    onChange={(e) => setBaixaNomeTitular(e.target.value)}
-                                                    placeholder="João da Silva Pereira"
-                                                    className="bg-navy border-blue-500/50 text-white h-8 text-sm"
-                                                />
-                                            </div>
-                                            <div className="space-y-1">
-                                                <label className="text-xs font-semibold text-blue-300">WhatsApp *</label>
-                                                <Input
-                                                    value={baixaWhatsapp}
-                                                    onChange={(e) => setBaixaWhatsapp(e.target.value)}
-                                                    placeholder="(11) 99999-9999"
-                                                    className="bg-navy border-blue-500/50 text-white h-8 text-sm"
-                                                />
-                                            </div>
-                                            <div className="grid grid-cols-2 gap-2">
-                                                <div className="space-y-1">
-                                                    <label className="text-xs font-semibold text-blue-300">Carro</label>
-                                                    <Input
-                                                        value={baixaCarro}
-                                                        onChange={(e) => setBaixaCarro(e.target.value)}
-                                                        placeholder="Modelo/Placa"
-                                                        className="bg-navy border-blue-500/50 text-white h-8 text-sm uppercase"
-                                                    />
-                                                </div>
-                                                <div className="space-y-1">
-                                                    <label className="text-xs font-semibold text-blue-300">Moto</label>
-                                                    <Input
-                                                        value={baixaMoto}
-                                                        onChange={(e) => setBaixaMoto(e.target.value)}
-                                                        placeholder="Modelo/Placa"
-                                                        className="bg-navy border-blue-500/50 text-white h-8 text-sm uppercase"
-                                                    />
-                                                </div>
-                                            </div>
-                                            <div className="space-y-1">
-                                                <label className="text-xs font-semibold text-blue-300">Dependentes (Opcional)</label>
-                                                <textarea
-                                                    value={baixaDependentes}
-                                                    onChange={(e) => setBaixaDependentes(e.target.value)}
-                                                    placeholder="Maria, João..."
-                                                    className="w-full bg-navy border border-blue-500/50 text-white rounded p-2 text-sm min-h-[60px]"
-                                                />
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-
-                            <div className="pt-2">
-                                <Button
-                                    onClick={handleBaixaTokenConfirmar}
-                                    disabled={baixaProcessando || !baixaTokenInput.trim()}
-                                    className={`w-full h-12 text-sm font-bold shadow-lg ${baixaProcessando ? 'bg-gray-600' : 'bg-blue-600 hover:bg-blue-500 text-white'}`}
-                                >
-                                    {baixaProcessando ? 'PROCESSANDO...' : 'CONFIRMAR RETIRADA'}
-                                </Button>
-                            </div>
-                        </CardContent>
-                    </Card>
-                </div>
-            )}
-
-            {/* Hidden Receipt Template for PDF generation */}
-            <ReceiptTemplate
-                ref={receiptRef}
-                encomenda={reciboGerado}
-                condominioName="Portaria Web"
-            />
+                {/* Hidden Receipt Template for PDF generation */}
+                <ReceiptTemplate
+                    ref={receiptRef}
+                    encomenda={reciboGerado}
+                    condominioName="Portaria Web"
+                />
             </div>
         </div>
     );

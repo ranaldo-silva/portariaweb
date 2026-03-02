@@ -42,6 +42,15 @@ export default function Admin() {
     const [selectedItem, setSelectedItem] = useState<any>(null);
     const [modalType, setModalType] = useState<any>('morador');
 
+    // New Encomendas Filters
+    const [filtroStatusEnc, setFiltroStatusEnc] = useState('Todas');
+    const [filtroBlocoEnc, setFiltroBlocoEnc] = useState('');
+    const [filtroApEnc, setFiltroApEnc] = useState('');
+
+    // New Motos Filters
+    const [filtroBlocoMoto, setFiltroBlocoMoto] = useState('');
+    const [filtroApMoto, setFiltroApMoto] = useState('');
+
     useEffect(() => {
         loadData();
     }, []);
@@ -232,7 +241,7 @@ export default function Admin() {
                     <CardHeader><CardTitle className="text-white flex items-center gap-2"><FileText className="text-gold" /> Aprovações Pendentes ({solicitacoes.length})</CardTitle></CardHeader>
                     <CardContent className="space-y-4">
                         {solicitacoes.map(sol => (
-                            <div key={sol.id} className="bg-navy p-4 rounded border border-gray-700 flex flex-col md:flex-row gap-4 items-start md:items-center">
+                            <div key={sol.id} className="bg-navy p-4 rounded-lg border border-gold/30 flex flex-col md:flex-row gap-4 items-start md:items-center hover:border-gold hover:shadow-md transition-all">
                                 <div className="flex-1">
                                     <h4 className="font-bold text-gold text-lg">
                                         {sol.tipo === 'novo_cadastro'
@@ -440,59 +449,121 @@ export default function Admin() {
     );
 
     const renderEncomendas = () => (
-        <div className="space-y-4 animate-in fade-in">
-            <div className="flex gap-2">
-                <div className="relative flex-1">
-                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
+        <div className="space-y-6 animate-in fade-in">
+            {/* Filter Bar */}
+            <div className="bg-navy p-4 rounded-lg border border-gold/30 shadow-md flex flex-col md:flex-row gap-4 items-end">
+                <div className="flex-1 w-full space-y-1">
+                    <label className="text-xs text-gold uppercase font-bold">Buscar por texto</label>
+                    <div className="relative">
+                        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
+                        <Input
+                            placeholder="Destinatário, Origem..."
+                            value={buscaEncomenda}
+                            onChange={e => setBuscaEncomenda(e.target.value)}
+                            className="pl-9 bg-white text-black"
+                        />
+                    </div>
+                </div>
+
+                <div className="w-full md:w-32 space-y-1">
+                    <label className="text-xs text-gold uppercase font-bold">Status</label>
+                    <select
+                        className="w-full h-10 px-3 rounded-md border border-gray-300 bg-white text-black text-sm"
+                        value={filtroStatusEnc}
+                        onChange={(e) => setFiltroStatusEnc(e.target.value)}
+                    >
+                        <option value="Todas">Todas</option>
+                        <option value="Pendente">Pendentes</option>
+                        <option value="Retirado">Entregues</option>
+                    </select>
+                </div>
+
+                <div className="w-full md:w-24 space-y-1">
+                    <label className="text-xs text-gold uppercase font-bold">Bloco</label>
                     <Input
-                        placeholder="Buscar por Destinatário, AP ou Origem..."
-                        value={buscaEncomenda}
-                        onChange={e => setBuscaEncomenda(e.target.value)}
-                        className="pl-9 bg-white text-black"
+                        placeholder="Ex: A"
+                        value={filtroBlocoEnc}
+                        onChange={e => setFiltroBlocoEnc(e.target.value)}
+                        className="bg-white text-black uppercase"
                     />
                 </div>
-                <Button onClick={loadData}>Atualizar</Button>
+
+                <div className="w-full md:w-24 space-y-1">
+                    <label className="text-xs text-gold uppercase font-bold">AP</label>
+                    <Input
+                        placeholder="Ex: 101"
+                        value={filtroApEnc}
+                        onChange={e => setFiltroApEnc(e.target.value)}
+                        className="bg-white text-black"
+                    />
+                </div>
+
+                <Button onClick={loadData} className="w-full md:w-auto mt-4 md:mt-0">Atualizar</Button>
             </div>
 
-            <div className="bg-white rounded-lg overflow-x-auto shadow">
-                <table className="w-full text-sm text-left text-gray-800">
-                    <thead className="bg-gray-100 text-gray-700">
-                        <tr>
-                            <th className="p-3">Data</th>
-                            <th className="p-3">Destino</th>
-                            <th className="p-3">Destinatário</th>
-                            <th className="p-3">Origem</th>
-                            <th className="p-3">Status</th>
-                            <th className="p-3 text-right">Ação</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-200">
-                        {encomendas.filter(e =>
-                            e.moradores?.nome_responsavel?.toLowerCase().includes(buscaEncomenda.toLowerCase()) ||
-                            e.destinatario?.toLowerCase().includes(buscaEncomenda.toLowerCase()) ||
-                            e.origem?.toLowerCase().includes(buscaEncomenda.toLowerCase()) ||
-                            String(e.apartamento).includes(buscaEncomenda)
-                        ).slice(0, 50).map(e => (
-                            <tr key={e.id} className="hover:bg-gray-50">
-                                <td className="p-3 text-xs text-gray-500">{new Date(e.data_chegada).toLocaleDateString()}</td>
-                                <td className="p-3 font-bold">AP {e.apartamento}</td>
-                                <td className="p-3">{e.destinatario}</td>
-                                <td className="p-3">{e.origem}</td>
-                                <td className="p-3">
-                                    <span className={`px-2 py-1 rounded-full text-xs font-bold ${e.status === 'Pendente' ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800'}`}>
-                                        {e.status}
-                                    </span>
-                                </td>
-                                <td className="p-3 text-right">
-                                    <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={() => { setSelectedItem(e); setModalType('encomenda'); }}>
-                                        <Edit className="h-4 w-4 text-blue-600" />
-                                    </Button>
-                                </td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
+            {/* Cards Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                {encomendas.filter(e => {
+                    // Texto
+                    const textMatch = e.moradores?.nome_responsavel?.toLowerCase().includes(buscaEncomenda.toLowerCase()) ||
+                        e.destinatario?.toLowerCase().includes(buscaEncomenda.toLowerCase()) ||
+                        e.origem?.toLowerCase().includes(buscaEncomenda.toLowerCase());
+
+                    // Status
+                    const statusMatch = filtroStatusEnc === 'Todas' || e.status === filtroStatusEnc;
+
+                    // Bloco
+                    const blocoMatch = filtroBlocoEnc === '' || (e.bloco || '').toUpperCase() === filtroBlocoEnc.toUpperCase();
+
+                    // AP
+                    const apMatch = filtroApEnc === '' || String(e.apartamento) === filtroApEnc;
+
+                    return textMatch && statusMatch && blocoMatch && apMatch;
+                }).slice(0, 100).map(e => (
+                    <Card
+                        key={e.id}
+                        className="bg-navy-light border-gold/40 hover:border-gold hover:shadow-lg transition-all cursor-pointer overflow-hidden group"
+                        onClick={() => { setSelectedItem(e); setModalType('encomenda'); }}
+                    >
+                        <div className={`h-1.5 w-full ${e.status === 'Pendente' ? 'bg-yellow-500' : 'bg-green-500'}`} />
+                        <CardContent className="p-4 space-y-3 relative">
+                            <div className="flex justify-between items-start">
+                                <span className={`px-2 py-0.5 rounded text-xs font-bold ${e.status === 'Pendente' ? 'bg-yellow-500/20 text-yellow-400' : 'bg-green-500/20 text-green-400'}`}>
+                                    {e.status}
+                                </span>
+                                <Edit className="h-4 w-4 text-blue-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+                            </div>
+
+                            <div>
+                                <h3 className="font-bold text-white text-lg truncate" title={e.destinatario || e.moradores?.nome_responsavel || 'Sem Destinatário'}>
+                                    {e.destinatario || e.moradores?.nome_responsavel || 'Sem Destinatário'}
+                                </h3>
+                                <p className="text-gold font-bold text-sm">
+                                    AP {e.apartamento} {e.bloco ? `- Bloco ${e.bloco}` : ''}
+                                </p>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-2 text-xs text-gray-400 border-t border-gray-700 pt-3">
+                                <div>
+                                    <span className="block mb-0.5">Origem:</span>
+                                    <span className="text-white truncate block" title={e.origem}>{e.origem}</span>
+                                </div>
+                                <div>
+                                    <span className="block mb-0.5">Chegada:</span>
+                                    <span className="text-white">{new Date(e.data_chegada).toLocaleDateString()}</span>
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+                ))}
             </div>
+
+            {encomendas.length === 0 && (
+                <div className="text-center p-8 bg-black/20 rounded-lg border border-gray-800 text-gray-500">
+                    <Package className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                    <p>Nenhuma encomenda encontrada com os filtros atuais.</p>
+                </div>
+            )}
         </div>
     );
 
@@ -610,52 +681,104 @@ export default function Admin() {
     );
 
     const renderMotos = () => (
-        <div className="space-y-4 animate-in fade-in">
-            <div className="flex gap-2">
-                <div className="relative flex-1">
-                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
+        <div className="space-y-6 animate-in fade-in">
+            {/* Filter Bar */}
+            <div className="bg-navy p-4 rounded-lg border border-gold/30 shadow-md flex flex-col md:flex-row gap-4 items-end">
+                <div className="flex-1 w-full space-y-1">
+                    <label className="text-xs text-gold uppercase font-bold">Buscar por texto</label>
+                    <div className="relative">
+                        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
+                        <Input
+                            placeholder="Morador ou Moto..."
+                            value={buscaMoto}
+                            onChange={e => setBuscaMoto(e.target.value)}
+                            className="pl-9 bg-white text-black"
+                        />
+                    </div>
+                </div>
+
+                <div className="w-full md:w-24 space-y-1">
+                    <label className="text-xs text-gold uppercase font-bold">Bloco</label>
                     <Input
-                        placeholder="Buscar por Morador, AP ou Moto..."
-                        value={buscaMoto}
-                        onChange={e => setBuscaMoto(e.target.value)}
-                        className="pl-9 bg-white text-black"
+                        placeholder="Ex: A"
+                        value={filtroBlocoMoto}
+                        onChange={e => setFiltroBlocoMoto(e.target.value)}
+                        className="bg-white text-black uppercase"
                     />
                 </div>
-                <Button onClick={loadData}>Atualizar</Button>
+
+                <div className="w-full md:w-24 space-y-1">
+                    <label className="text-xs text-gold uppercase font-bold">AP</label>
+                    <Input
+                        placeholder="Ex: 101"
+                        value={filtroApMoto}
+                        onChange={e => setFiltroApMoto(e.target.value)}
+                        className="bg-white text-black"
+                    />
+                </div>
+
+                <Button onClick={loadData} className="w-full md:w-auto mt-4 md:mt-0">Atualizar</Button>
             </div>
 
-            <div className="bg-white rounded-lg overflow-x-auto shadow">
-                <table className="w-full text-sm text-left text-gray-800">
-                    <thead className="bg-gray-100 text-gray-700">
-                        <tr>
-                            <th className="p-3">Data/Hora</th>
-                            <th className="p-3">Morador</th>
-                            <th className="p-3">Unidade</th>
-                            <th className="p-3">Moto/Placa</th>
-                            <th className="p-3 text-right">Ação</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-200">
-                        {motos.filter(m =>
-                            m.morador_nome?.toLowerCase().includes(buscaMoto.toLowerCase()) ||
-                            m.moto_detalhes?.toLowerCase().includes(buscaMoto.toLowerCase()) ||
-                            String(m.apartamento).includes(buscaMoto)
-                        ).slice(0, 50).map(m => (
-                            <tr key={m.id} className="hover:bg-gray-50">
-                                <td className="p-3 text-xs text-gray-500">{new Date(m.data_entrada).toLocaleString()}</td>
-                                <td className="p-3 font-bold">{m.morador_nome}</td>
-                                <td className="p-3">AP {m.apartamento} {m.bloco}</td>
-                                <td className="p-3">{m.moto_detalhes}</td>
-                                <td className="p-3 text-right">
-                                    <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={() => { setSelectedItem(m); setModalType('moto'); }}>
-                                        <Edit className="h-4 w-4 text-blue-600" />
-                                    </Button>
-                                </td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
+            {/* Cards Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                {motos.filter(m => {
+                    // Texto
+                    const textMatch = m.morador_nome?.toLowerCase().includes(buscaMoto.toLowerCase()) ||
+                        m.moto_detalhes?.toLowerCase().includes(buscaMoto.toLowerCase());
+
+                    // Bloco
+                    const blocoMatch = filtroBlocoMoto === '' || (m.bloco || '').toUpperCase() === filtroBlocoMoto.toUpperCase();
+
+                    // AP
+                    const apMatch = filtroApMoto === '' || String(m.apartamento) === filtroApMoto;
+
+                    return textMatch && blocoMatch && apMatch;
+                }).slice(0, 100).map(m => (
+                    <Card
+                        key={m.id}
+                        className="bg-navy-light border-gold/40 hover:border-gold hover:shadow-lg transition-all cursor-pointer overflow-hidden group"
+                        onClick={() => { setSelectedItem(m); setModalType('moto'); }}
+                    >
+                        <div className="h-1.5 w-full bg-blue-500" />
+                        <CardContent className="p-4 space-y-3 relative">
+                            <div className="flex justify-between items-start">
+                                <span className="px-2 py-0.5 rounded text-xs font-bold bg-blue-500/20 text-blue-400 flex items-center gap-1">
+                                    <Bike className="w-3 h-3" /> Registro
+                                </span>
+                                <Edit className="h-4 w-4 text-blue-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+                            </div>
+
+                            <div>
+                                <h3 className="font-bold text-white text-lg truncate" title={m.morador_nome}>
+                                    {m.morador_nome || 'Desconhecido'}
+                                </h3>
+                                <p className="text-gold font-bold text-sm">
+                                    AP {m.apartamento} {m.bloco ? `- Bloco ${m.bloco}` : ''}
+                                </p>
+                            </div>
+
+                            <div className="grid grid-cols-1 gap-2 text-xs text-gray-400 border-t border-gray-700 pt-3">
+                                <div>
+                                    <span className="block mb-0.5">Moto/Placa:</span>
+                                    <span className="text-white truncate block font-medium" title={m.moto_detalhes}>{m.moto_detalhes}</span>
+                                </div>
+                                <div className="flex justify-between border-t border-gray-700/50 pt-2 mt-1">
+                                    <span>Data/Hora:</span>
+                                    <span className="text-white">{new Date(m.data_entrada).toLocaleString()}</span>
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+                ))}
             </div>
+
+            {motos.length === 0 && (
+                <div className="text-center p-8 bg-black/20 rounded-lg border border-gray-800 text-gray-500">
+                    <Bike className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                    <p>Nenhuma moto encontrada com os filtros atuais.</p>
+                </div>
+            )}
         </div>
     );
 

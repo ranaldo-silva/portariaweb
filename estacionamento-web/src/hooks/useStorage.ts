@@ -308,7 +308,7 @@ export const useStorage = () => {
         } catch { return []; }
     }, []);
 
-    const validarTokenRetirada = useCallback(async (ids: string[], input: string, efetivarCadastro: boolean = false, dadosCompletos: any = null) => {
+    const validarTokenRetirada = useCallback(async (ids: string[], input: string, efetivarCadastro: boolean = false, dadosCompletos: any = null, nomeRecebedor: string = "") => {
         if (!ids || ids.length === 0) return { sucesso: false, msg: "Nenhum pacote selecionado." };
         const tokenIdPrincipal = ids[0]; // Usamos o primeiro para validar a autorização
         try {
@@ -336,11 +336,13 @@ export const useStorage = () => {
 
             if (!autorizado) return { sucesso: false, msg: "Token incorreto ou CPF inválido!" };
 
+            const finalNomeRecebedor = nomeRecebedor ? `${formatarNomeProprio(nomeRecebedor)} (${metodoRetirada})` : metodoRetirada;
+
             const { error: updateError } = await supabase
                 .from('encomendas').update({
                     status: 'Retirado',
                     data_retirada: new Date().toISOString(),
-                    retirado_por: metodoRetirada
+                    retirado_por: finalNomeRecebedor
                 }).in('id', ids);
 
             if (!updateError && efetivarCadastro && enc.morador_id) {
@@ -348,9 +350,9 @@ export const useStorage = () => {
                     lista_moradores: "" // Limpando dependentes antigas do avulso
                 };
                 if (inputClean.length === 11) {
-                     updateData.cpf = inputClean;
+                    updateData.cpf = inputClean;
                 }
-                
+
                 if (dadosCompletos) {
                     if (dadosCompletos.nomeTitular) updateData.nome_responsavel = formatarNomeProprio(dadosCompletos.nomeTitular);
                     if (dadosCompletos.whatsapp) updateData.whatsapp = dadosCompletos.whatsapp.replace(/\D/g, "");
@@ -415,7 +417,7 @@ export const useStorage = () => {
                     cpf: cpfRecebedor ? cpfRecebedor.replace(/\D/g, "") : "",
                     lista_moradores: "" // Limpando dependentes antigas do avulso
                 };
-                
+
                 if (dadosCompletos) {
                     if (dadosCompletos.whatsapp) updateData.whatsapp = dadosCompletos.whatsapp.replace(/\D/g, "");
                     if (dadosCompletos.carro) updateData.carro_detalhes = dadosCompletos.carro.toUpperCase();
@@ -886,7 +888,7 @@ export const useStorage = () => {
         } catch { return []; }
     }, [getMoradoresBase]);
 
-    const registrarEntradaMoto = useCallback(async (dados: { morador_nome: string, apartamento: string, bloco: string, moto_detalhes: string, fotoFile: File | null }) => {
+    const registrarEntradaMoto = useCallback(async (dados: { morador_nome: string, apartamento: string, bloco: string, moto_detalhes: string, fotoFile: File | null, isPendente?: boolean, novoNomeDono?: string }) => {
         try {
             const fotoUrl = dados.fotoFile ? await startUpload(dados.fotoFile, 'motos') : "";
 
@@ -894,8 +896,28 @@ export const useStorage = () => {
                 console.error("[registrarEntradaMoto] Foto foi fornecida mas URL retornou vazia (provável falha de upload)");
             }
 
+            let nomeDono = dados.morador_nome;
+
+            if (dados.isPendente && dados.novoNomeDono && dados.fotoFile) { // Só efetiva se tiver todos os dados
+                nomeDono = `${formatarNomeProprio(dados.novoNomeDono)} (Avulso)`;
+                // 1. Criar morador temporário
+                const { data: novoMorador, error: errMorador } = await supabase.from('moradores').insert([{
+                    nome_responsavel: "Pendente Cadastro",
+                    apartamento: parseInt(dados.apartamento) || 0,
+                    bloco: (dados.bloco || "").toUpperCase(),
+                    lista_moradores: formatarNomeProprio(dados.novoNomeDono || ""),
+                    moto_detalhes: dados.moto_detalhes
+                }]).select().single();
+
+                if (!errMorador && novoMorador) {
+                    await sincronizarMoradores(true);
+                } else {
+                    console.error("[registrarEntradaMoto] Falha ao criar pendente:", errMorador);
+                }
+            }
+
             const { error } = await supabase.from('controle_motos').insert([{
-                morador_nome: formatarNomeProprio(dados.morador_nome),
+                morador_nome: formatarNomeProprio(nomeDono),
                 apartamento: dados.apartamento,
                 bloco: dados.bloco,
                 moto_detalhes: dados.moto_detalhes,
@@ -911,7 +933,7 @@ export const useStorage = () => {
             console.error("[registrarEntradaMoto] Exceção geral:", e);
             return false;
         }
-    }, []);
+    }, [sincronizarMoradores, startUpload]);
 
     const getHistoricoMotos = useCallback(async () => {
         try {
